@@ -1,12 +1,12 @@
 """
-Export the original Blender scene to a glTF GLB for Three.js.
+Export the six-paper Blender v3 scene to a glTF GLB for Three.js.
 
 Run from the repository root:
     blender --background --python tools/export_scene.py
 
 The original .blend is opened but NEVER saved/overwritten. 300+ repeated
 static objects are merged in-memory, named feature surfaces remain separate,
-and all 360 camera poses + the animated lens are written as JSON.
+and all 672 camera poses + the animated lens are written as JSON.
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import bpy
 from mathutils import Matrix
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "Paper Portfolio" / "paper_portfolio_final.blend"
+SOURCE = ROOT / "new model" / "Paper Portfolio — Final Project — 2026-10-10" / "paper_portfolio_six_papers_v3.blend"
 OUTPUT = ROOT / "public" / "assets"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 GLB = OUTPUT / "paper-scene.glb"
@@ -33,6 +33,11 @@ scene = bpy.context.scene
 camera = bpy.data.objects.get("Portfolio preview camera")
 if not camera or camera.type != "CAMERA":
     raise RuntimeError("The source Blender project lacks the animated Portfolio preview camera.")
+if scene.frame_end != 672:
+    raise RuntimeError(f"Expected six-paper v3 camera range ending at 672, got {scene.frame_end}")
+for sheet in "ABCDEF":
+    if not bpy.data.objects.get(f"Paper {sheet} | hero surface"):
+        raise RuntimeError(f"Expected Paper {sheet} hero surface in the new scene")
 
 # Y-up conversion exactly matches Blender glTF's Blender-Z-up -> glTF-Y-up.
 axis_conversion = Matrix.Rotation(-math.pi / 2.0, 4, "X")
@@ -57,7 +62,13 @@ camera_json = {
     "end": scene.frame_end,
     "sensorWidth": float(camera.data.sensor_width),
     "frames": samples,
-    "holds": {"intro": [1, 25], "paper-a": [108, 139], "paper-b": [222, 253], "screen": [330, 360]},
+    "holds": {
+        "intro": [1, 25],
+        "paper-a": [96, 121], "paper-b": [192, 217],
+        "paper-c": [276, 301], "paper-d": [360, 385],
+        "paper-e": [444, 469], "paper-f": [528, 554],
+        "screen": [636, 672],
+    },
 }
 PATH_JSON.write_text(json.dumps(camera_json, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 print("[paper-export] Camera: ", len(samples), "samples, first", samples[0], "last", samples[-1])
@@ -77,7 +88,7 @@ for volume_name in ("Depth luminous haze", "Faint workstation atmospheric halo")
 # The curved hero surfaces have NO UVs in the original Blender file.
 # Create planar UVs from each vertex's local X/Y coordinates. Their curvature
 # on Z is preserved so the printed artwork catches scene light correctly.
-for key in ("Paper A | hero surface", "Paper B | hero surface"):
+for key in (f"Paper {letter} | hero surface" for letter in "ABCDEF"):
     paper = bpy.data.objects.get(key)
     if not paper or paper.type != "MESH":
         raise RuntimeError("Expected paper hero mesh missing: " + key)
@@ -87,7 +98,7 @@ for key in ("Paper A | hero surface", "Paper B | hero surface"):
     min_x, min_y = min(xs), min(ys)
     len_x = max(max(xs) - min_x, 1e-6)
     len_y = max(max(ys) - min_y, 1e-6)
-    uv = mesh.uv_layers.new(name="PORTFOLIO_CONTENT_UV")
+    uv = mesh.uv_layers.get("PORTFOLIO_CONTENT_UV") or mesh.uv_layers.new(name="PORTFOLIO_CONTENT_UV")
     for poly in mesh.polygons:
         for li in poly.loop_indices:
             vert = mesh.vertices[mesh.loops[li].vertex_index]

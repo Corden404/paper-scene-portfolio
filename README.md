@@ -1,6 +1,6 @@
 # Paper Scene — cinematic interactive portfolio
 
-An immersive two-project portfolio powered by the original Blender scene. The camera travels from the paper canopy through two featured pieces and finishes at an interactive desktop portfolio. Project content lives in `src/config/portfolio.ts`, not inside the Blender file.
+An immersive six-paper portfolio powered by the new Blender v3 scene. The camera travels through six featured paper sheets and ends at an interactive desktop portfolio. Project content lives in `src/config/portfolio.ts`, not in the Blender file.
 
 ## 本地运行 / Quick start
 
@@ -20,7 +20,7 @@ Open the URL printed by Vite. The scene requires `public/assets/paper-scene.glb`
 blender --background --python tools/export_scene.py
 ```
 
-The export script defaults to `Paper Portfolio/paper_portfolio_final.blend` and writes to `public/assets`. If Blender is not on your PATH, use its full executable path. The script **never saves the source .blend**. Importantly, it leaves out the two Cycles-only fog volumes which otherwise become opaque blocking meshes in WebGL.
+The export script reads `new model/Paper Portfolio — Final Project — 2026-10-10/paper_portfolio_six_papers_v3.blend` and writes to `public/assets`. The old Blender source is preserved in `Paper Portfolio/`. If Blender is not on your PATH, use its full executable path. The script **never saves the source .blend**. Importantly, it leaves out the two Cycles-only fog volumes which otherwise become opaque blocking meshes in WebGL.
 
 ```bash
 npm run verify:scene    # Validate the exported GLB and complete camera track
@@ -30,17 +30,19 @@ npm run test:smoke      # Desktop browser interaction test (Chrome required)
 npm run test:mobile     # Mobile / reduced-motion / skip test (Chrome required)
 ```
 
+镜头的八个真实停留段（开场、六张作品纸、电脑）保存于 `public/assets/camera-path.json`。改为只显示前四张纸时仍保留电脑网页中的所有六项成果。浏览器性能依赖硬件和网络，当前未保证任何设备均为 60 FPS。
+
 ## Controls
 
-Click the scene or **Next chapter** to advance from opening → Paper A → Paper B → computer. **Skip intro** / **View all work** jumps straight to the screen while accelerating through the original safe camera path. Use **Back** to reverse or **Revisit the scene** after arriving at the screen. `prefers-reduced-motion` and mobile-size renderers use simpler effects by default.
+Click the scene or **Next chapter** to advance from opening → Paper A → B → C → D → E → F → computer. **Skip intro** / **View all work** jumps straight to the screen while accelerating through the original safe camera path. Use **Back** to reverse or **Revisit the scene** after arriving at the screen. `prefers-reduced-motion` and mobile-size renderers use simpler effects by default.
 
 ## Customizing content
 
-Change the name, introduction, paper designs, projects, and links in `src/config/portfolio.ts`. **The shipped achievements and texts are editorial DEMO placeholders, not real claims.** The two paper surfaces are rendered with canvas-based ink textures, lit and curved as part of their 3D geometry. Avoid embedding private contact details in this public config. For more projects later, keep the featured paper chapters short and add more data to the final HTML portfolio.
+Change the name, introduction, paper designs, projects, and links in `src/config/portfolio.ts`. **The shipped achievements and texts are editorial DEMO placeholders, not real claims.** The six independent paper surfaces are rendered with editable Canvas textures, lit and curved as part of their 3D geometry. Set `portfolio.featuredPaperCount` from 1–6 (e.g. 4) to skip any later chapters and go directly to the computer. There is still only ONE camera route. Avoid embedding private contact details in this public config. For more projects later, keep the featured paper chapters short and add more data to the final HTML portfolio.
 
 ## How it works
 
-- Blender source stays unchanged. `tools/export_scene.py` extracts the camera's world-space position, rotation and focal length for all 360 frames, transforms them to glTF's Y-up coordinates, and exports a web-compatible GLB with the scene's mesh materials and packed image resources.
+- Blender source stays unchanged. `tools/export_scene.py` extracts the camera's world-space position, rotation and focal length for all 672 frames, transforms them to glTF's Y-up coordinates, and exports a web-compatible GLB with the scene's mesh materials and packed image resources.
 - Camera movement plays in controlled segments, retaining the Blender camera's original easing. The code also supports accelerated skipping.
 - Ambient paper motion is subtle and deterministic: GPU shaders animate disconnected sheet islands of the canopy, cascade and paper tiers independently; separately modelled airborne sheets and hero papers float gently. Ground debris intentionally stays on the floor.
 - WebGL and cinematic grading are used for the immersive part; the screen transition ultimately becomes accessible, selectable HTML.

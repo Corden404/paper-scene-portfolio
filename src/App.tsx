@@ -5,7 +5,7 @@ import type { ErrorInfo, ReactNode } from 'react';
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three';
 import PaperWorld from './components/PaperWorld';
 import FinalPortfolio from './components/FinalPortfolio';
-import { portfolio, stages } from './config/portfolio';
+import { featuredProjects, portfolio, stages } from './config/portfolio';
 import type { Stage } from './config/portfolio';
 
 type BoundaryProps = { children: ReactNode; onError: (message: string) => void };
@@ -16,23 +16,12 @@ class SceneErrorBoundary extends Component<BoundaryProps, { failed: boolean }> {
   render() { return this.state.failed ? null : this.props.children; }
 }
 
-const chapterCopy: Record<Exclude<Stage, 'screen'>, { index: string; eyebrow: string; heading: string; description: string }> = {
-  intro: {
-    index: '00', eyebrow: 'A DIFFERENT KIND OF PORTFOLIO',
-    heading: 'IDEAS DON\'T\nSTAY ON PAPER.',
-    description: 'A quiet space for the things that make us curious. Follow the pages to see what comes next.',
-  },
-  'paper-a': {
-    index: '01', eyebrow: 'CHAPTER ONE / SELECTED WORK',
-    heading: 'EVERYTHING\nBEGINS SOMEWHERE.',
-    description: portfolio.projects[0].summary,
-  },
-  'paper-b': {
-    index: '02', eyebrow: 'CHAPTER TWO / SELECTED WORK',
-    heading: 'A QUESTION\nBECOMES A WORLD.',
-    description: portfolio.projects[1].summary,
-  },
+const openingChapter = {
+  index: '00', eyebrow: 'A DIFFERENT KIND OF PORTFOLIO',
+  heading: "IDEAS DON'T\nSTAY ON PAPER.",
+  description: 'A quiet space for the things that make us curious. Follow the pages to see what comes next.',
 };
+const lastFeaturedPaper = featuredProjects[featuredProjects.length - 1].id;
 
 function useMotionPreferences() {
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -79,7 +68,9 @@ export default function App() {
   }, [stage, moving, ready, webEntered, reducedMotion]);
 
   const goTo = useCallback((next: Stage) => {
-    if (!ready || loadError || moving) return;
+    // Jumping to the computer is always allowed, even during a camera move.
+    // The current GSAP segment is cancelled and the existing path is sped up.
+    if (!ready || loadError || (moving && next !== 'screen')) return;
     if (next === stage) return;
     setWebEntered(false);
     setStage(next);
@@ -107,13 +98,19 @@ export default function App() {
       }
       if (event.key === 'ArrowLeft' && !webEntered) { event.preventDefault(); back(); }
       if (event.key === 'End' && !webEntered) { event.preventDefault(); goTo('screen'); }
-      if (event.key === 'Escape' && webEntered) goTo('paper-b');
+      if (event.key === 'Escape' && webEntered) goTo(lastFeaturedPaper);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [next, back, webEntered, goTo]);
 
-  const chapter = stage !== 'screen' ? chapterCopy[stage] : chapterCopy['paper-b'];
+  const chapterProject = portfolio.projects.find((project) => project.id === stage);
+  const chapter = chapterProject ? {
+    index: chapterProject.number,
+    eyebrow: `${chapterProject.tag} / SELECTED WORK`,
+    heading: chapterProject.heroHeading,
+    description: chapterProject.summary,
+  } : openingChapter;
   const isIntro = stage === 'intro';
 
   return (
@@ -167,7 +164,7 @@ export default function App() {
             <span>{quality === 'cinema' ? 'CINEMA' : 'LITE'}</span>
           </button>
           <span className="header-divider" />
-          <button type="button" className="text-link" onClick={() => goTo('screen')} disabled={!ready || moving}>
+          <button type="button" className="text-link" onClick={() => goTo('screen')} disabled={!ready || stage === 'screen'}>
             SKIP INTRO <ArrowUpRight size={15} />
           </button>
         </div>
@@ -175,9 +172,9 @@ export default function App() {
 
       {!webEntered && !loadError && (
         <>
-          <div className={'scene-copy scene-copy--' + stage + (moving ? ' scene-copy--moving' : '')}>
+          <div className={'scene-copy scene-copy--' + stage + (chapterProject ? ' scene-copy--featured-paper' : '') + (moving ? ' scene-copy--moving' : '')}>
             <div className="intro-rule"><span /> <p>{chapter.eyebrow}</p></div>
-            <p className="scene-copy__index">{chapter.index} / 03</p>
+            <p className="scene-copy__index">{chapter.index} / {String(stages.length - 1).padStart(2, '0')}</p>
             <h1>{chapter.heading.split('\n').map((line) => <span key={line}>{line}</span>)}</h1>
             <p className="scene-copy__desc">{chapter.description}</p>
             {isIntro && <p className="intro-hint"><MousePointer2 size={14} /> CLICK ANYWHERE TO EXPLORE</p>}
@@ -185,7 +182,7 @@ export default function App() {
 
           <div className="stage-caption">
             <span className="caption-line" />
-            <span>{stage === 'intro' ? 'THE OPENING' : stage === 'paper-a' ? 'IN FOCUS / 001' : stage === 'paper-b' ? 'IN FOCUS / 002' : 'THE FINAL FRAME'}</span>
+            <span>{stage === 'intro' ? 'THE OPENING' : stage === 'screen' ? 'THE FINAL FRAME' : `IN FOCUS / ${chapter.index.padStart(3, '0')}`}</span>
           </div>
 
           <footer className="scene-footer">
@@ -199,7 +196,7 @@ export default function App() {
                 >
                   <span className="chapter-marker__index">0{index}</span>
                   <span className="chapter-marker__bar" />
-                  <span className="chapter-marker__name">{['THE SPACE', 'THE FIRST', 'THE SECOND', 'THE SCREEN'][index]}</span>
+                  <span className="chapter-marker__name">{entry === 'intro' ? 'THE SPACE' : entry === 'screen' ? 'THE SCREEN' : `PAPER ${String(index).padStart(2, '0')}`}</span>
                 </button>
               ))}
             </div>
@@ -208,7 +205,7 @@ export default function App() {
                 <button className="back-button" type="button" onClick={back} disabled={!ready || moving}><ArrowLeft size={17} /> BACK</button>
               )}
               <button className="next-button" type="button" onClick={stage === 'screen' ? () => setWebEntered(true) : next} disabled={!ready || moving}>
-                {stage === 'screen' ? 'ENTER PORTFOLIO' : isIntro ? 'BEGIN JOURNEY' : stage === 'paper-b' ? 'THE FULL STORY' : 'NEXT CHAPTER'}
+                {stage === 'screen' ? 'ENTER PORTFOLIO' : isIntro ? 'BEGIN JOURNEY' : stage === lastFeaturedPaper ? 'THE FULL STORY' : 'NEXT CHAPTER'}
                 {stage === 'screen' ? <Monitor size={17} /> : <ArrowRight size={18} />}
               </button>
             </div>
@@ -238,7 +235,7 @@ export default function App() {
         </div>
       )}
 
-      {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={() => goTo('paper-b')} /></div>}
+      {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={() => goTo(lastFeaturedPaper)} /></div>}
       <div className="preload-tag" aria-hidden="true"><ChevronRight size={1} /></div>
     </div>
   );

@@ -104,27 +104,20 @@ function configureScene(scene: Object3D, sheetShaders: SheetShader[]) {
 
   scene.traverse((object) => {
     const name = object.name.replace(/_/g, ' '); // GLTFLoader normalizes spaces to underscores.
-    if (/^Paper [AB] \| (mock image|fine rule|temporary heading|temporary note|text line|label)/i.test(name)) {
+    const paperPart = /^Paper ([A-F]) \| (.+)$/i.exec(name);
+    if (paperPart && /^(mock image|fine rule|temporary heading|temporary note|text line|label)/i.test(paperPart[2])) {
       object.visible = false;
     }
+    if (paperPart && paperPart[2] === 'editable layout anchor') heroes.push(object);
 
-    if (/^Paper [AB] \| editable layout anchor/.test(name)) heroes.push(object);
-
-    if (isMesh(object) && name === 'Paper A | hero surface') {
+    if (isMesh(object) && paperPart && paperPart[2] === 'hero surface') {
+      const sheetIndex = paperPart[1].toUpperCase().charCodeAt(0) - 65;
+      // Preserve real curved 3D surfaces, but replace the Blender's temporary
+      // ink with config-driven canvas textures for all six sheets.
       object.material = new MeshStandardMaterial({
-        map: textures[0], color: '#fffdf4', roughness: 0.94, metalness: 0,
-        // A little calibrated diffuse bounce keeps printed ink legible in the
-        // backlit hall; it stays dark in shade and never behaves like a screen.
-        emissive: '#9eafa7', emissiveIntensity: 0.09,
-        side: DoubleSide,
-      });
-      disposable.push(object.material);
-    }
-    if (isMesh(object) && name === 'Paper B | hero surface') {
-      object.material = new MeshStandardMaterial({
-        map: textures[1], color: '#fffdf4', roughness: 0.94, metalness: 0,
-        emissive: '#9eafa7', emissiveIntensity: 0.09,
-        side: DoubleSide,
+        map: textures[sheetIndex], color: '#fffdf4', roughness: 0.94, metalness: 0,
+        // Diffuse ambient bounce allows legible ink without self-lit text.
+        emissive: '#9eafa7', emissiveIntensity: 0.09, side: DoubleSide,
       });
       disposable.push(object.material);
     }

@@ -24,7 +24,7 @@ function ProjectDetail({ project, onClose }: { project: PortfolioProject; onClos
             <X size={20} />
           </button>
         </div>
-        <div className={'detail-art detail-art--' + project.style} aria-hidden="true">
+        <div className={'detail-art detail-art--' + project.style} style={{ background: project.accent }} aria-hidden="true">
           <span className="detail-art__number">{project.number}</span>
           <span className="detail-art__rings" />
         </div>
@@ -83,21 +83,21 @@ export default function FinalPortfolio({ onRevisit }: Props) {
               <p className="web-eyebrow">01 / THE PROJECTS</p>
               <h2>Selected <em>works.</em></h2>
             </div>
-            <p>Two highlighted ideas from an ongoing practice. Explore each chapter for its story, process and outcome.</p>
+            <p>{portfolio.projects.length} selected ideas from an ongoing practice. Explore each chapter for its story, process and outcome.</p>
           </div>
           <div className="project-grid">
-            {portfolio.projects.map((project, i) => (
+            {portfolio.projects.map((project) => (
               <button
                 className="project-card" type="button" key={project.id}
                 onClick={() => setSelected(project)}
                 aria-label={'Open ' + project.title.replace('\n', ' ')}
               >
-                <span className={'project-card__visual project-card__visual--' + project.style}>
+                <span className={'project-card__visual project-card__visual--' + project.style} style={{ background: project.accent }}>
                   <span className="project-card__visual-index">NO. {project.number}</span>
                   <span className="project-card__artwork" aria-hidden="true">
                     {Array.from({ length: 12 }, (_, j) => <i key={j} style={{ '--ring': j } as React.CSSProperties} />)}
                   </span>
-                  <span className="project-card__visual-foot">AN EXPLORATION IN {i === 0 ? 'FORM' : 'SYSTEMS'}</span>
+                  <span className="project-card__visual-foot">{project.keywords[0]}  /  {project.keywords[1]}</span>
                 </span>
                 <span className="project-card__category">{project.category} / {project.year}<ArrowUpRight size={19} /></span>
                 <span className="project-card__title">{project.title.replace('\n', ' ')}</span>

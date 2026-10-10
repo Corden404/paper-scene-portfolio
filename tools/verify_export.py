@@ -18,7 +18,7 @@ chunk_size, chunk_type = struct.unpack_from("<II", data, 12)
 assert chunk_type == 0x4E4F534A, "First GLB chunk must be JSON"
 gltf = json.loads(data[20:20 + chunk_size])
 names = {obj.get("name", "") for obj in gltf.get("nodes", [])}
-for needle in ("Paper A | hero surface", "Paper B | hero surface", "Monitor warm display"):
+for needle in (*[f"Paper {i} | hero surface" for i in "ABCDEF"], "Monitor warm display"):
     assert needle in names, f"GLB missing key geometry: {needle}"
 for forbidden in ("Depth luminous haze", "Faint workstation atmospheric halo"):
     assert forbidden not in names, f"WebGL cannot render Cycles-only volume mesh: {forbidden}"
@@ -31,9 +31,13 @@ for node in gltf["nodes"]:
         phase_nodes.append(node.get("name", ""))
 assert len(phase_nodes) >= 20, f"Expected floating sheet island attributes on canopy and cascade; found {len(phase_nodes)}"
 assert sum(name.startswith("Irregular descending cascade") for name in phase_nodes) >= 5
-frames = json.loads(camera_file.read_text(encoding="utf-8"))["frames"]
-assert len(frames) == 360
-assert frames[0]["frame"] == 1 and frames[-1]["frame"] == 360
+camera = json.loads(camera_file.read_text(encoding="utf-8"))
+frames = camera["frames"]
+assert camera["source"] == "paper_portfolio_six_papers_v3.blend"
+assert len(frames) == 672
+assert frames[0]["frame"] == 1 and frames[-1]["frame"] == 672
+assert list(camera["holds"]) == ["intro", "paper-a", "paper-b", "paper-c", "paper-d", "paper-e", "paper-f", "screen"]
+assert all(1 <= a <= b <= 672 for a, b in camera["holds"].values())
 assert all(len(f["position"]) == 3 and len(f["quaternion"]) == 4 for f in frames)
 print("GLB VALID", len(data), "bytes", len(gltf.get("nodes", [])), "nodes", len(gltf.get("meshes", [])), "meshes")
 print("CAMERA VALID", len(frames), "frames")
