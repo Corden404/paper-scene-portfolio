@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+!.env.example
+*.log
+*.blend1
+*.blend2
+__pycache__/
+.pytest_cache/
+.DS_Store
+Thumbs.db
+.playwright/
+# Derived exports can be recreated from the source Blender scene.
+public/assets/*.raw.glb
+public/assets/*.tmp.glb
+# Internal agent/planning scratch files must remain local.
+.agents/
+.work/
+.plans/
+.trash/
