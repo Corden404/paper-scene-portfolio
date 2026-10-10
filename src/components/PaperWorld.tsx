@@ -1,4 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
+import CinematicAtmosphere from './CinematicAtmosphere';
+
 import { useGLTF } from '@react-three/drei';
 import { Bloom, EffectComposer, Noise, Vignette } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
@@ -6,6 +8,7 @@ import gsap from 'gsap';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AdditiveBlending,
+  Color,
   DoubleSide,
   MathUtils,
   Mesh,
@@ -39,6 +42,12 @@ const cameraPoint = new Vector3();
 const cameraRotation = new Quaternion();
 const cameraRotationNext = new Quaternion();
 const clamp = MathUtils.clamp;
+const SKY_LIGHT_COLOR = new Color().setRGB(3.2, 3.8, 4.1);
+const PAPER_FOCUS_LIGHTS = {
+  'paper-a': [-1.8, 3.4, 6], 'paper-b': [1.25, 2.4, 3.1],
+  'paper-c': [2.35, 3.45, 4.8], 'paper-d': [3.05, 1.75, 2.8],
+  'paper-e': [1.95, 2.65, 1.5], 'paper-f': [0.1, 3.15, 2.6],
+} as const;
 
 function updateCamera(camera: PerspectiveCamera, path: CameraPath, time: number, aspect: number) {
   const samples = path.frames;
@@ -72,26 +81,66 @@ function isMesh(object: Object3D): object is Mesh {
   return (object as Mesh).isMesh === true;
 }
 
-function attachPaperMotion(mesh: Mesh, shaderRefs: SheetShader[]) {
-  const geometry = mesh.geometry;
-  const attribute = geometry.getAttribute('_SHEET_PHASE');
-  if (!attribute || Array.isArray(mesh.material)) return;
-  const material = mesh.material.clone();
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uPaperTime = { value: 0 };
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <common>',
-      '#include <common>\nattribute float _SHEET_PHASE;\nuniform float uPaperTime;'
-    ).replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>\n' +
-      'float sheetWave = sin(uPaperTime * (0.60 + fract(_SHEET_PHASE * 0.71) * 0.45) + _SHEET_PHASE * 6.28318);\n' +
-      'transformed += vec3(0.005 * sin(uPaperTime * 0.43 + _SHEET_PHASE * 6.28318), 0.005 * sheetWave, 0.006 * sheetWave);'
-    );
-    shaderRefs.push(shader as unknown as SheetShader);
-  };
-  material.customProgramCacheKey = () => 'paper-sway-v1';
-  mesh.material = material;
+/**
+ * Rebuild the missing thin-sheet scattering from the original Cycles shader.
+ * The glTF export keeps ink textures but cannot represent Blender's
+ * translucent BSDF mix. Add a view-dependent, back-lit diffuse term AFTER
+ * the original PBR lighting; preserve printed detail and true opaque depth.
+ *
+ * Individual sheets and each disconnected canopy island share the same
+ * shading model. glTF uses _SHEET_PHASE, but GLTFLoader lowercases custom
+ * geometry attributes to _sheet_phase before Three.js renders them.
+ */
+function enhanceAirbornePaper(
+  mesh: Mesh,
+  shaderRefs: SheetShader[],
+  disposable: Array<{ dispose(): void }>,
+) {
+  const sway = !!mesh.geometry.getAttribute('_sheet_phase');
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const enhanced = materials.map((original) => {
+    const material = original.clone();
+    material.side = DoubleSide;
+    material.onBeforeCompile = (shader) => {
+      if (sway) shader.uniforms.uPaperTime = { value: 0 };
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>',
+          '#include <common>\n' +
+          'varying vec3 vCinemaWorldNormal;\nvarying vec3 vCinemaWorldPos;\n' +
+          (sway ? 'attribute float _sheet_phase;\nuniform float uPaperTime;' : ''))
+        .replace('#include <begin_vertex>',
+          '#include <begin_vertex>\n' +
+          (sway
+            ? 'float paperSway = sin(uPaperTime * (0.60 + fract(_sheet_phase * .71) * .45) + _sheet_phase * 6.28318);\n' +
+              'transformed += vec3(.005 * sin(uPaperTime * .43 + _sheet_phase * 6.28318), .005 * paperSway, .006 * paperSway);'
+            : ''))
+        .replace('#include <project_vertex>',
+          '#include <project_vertex>\n' +
+          'vCinemaWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\n' +
+          'vCinemaWorldNormal = normalize(mat3(modelMatrix) * normal);');
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>',
+          '#include <common>\nvarying vec3 vCinemaWorldNormal;\nvarying vec3 vCinemaWorldPos;')
+        // Three.js r177 uses opaque_fragment; output_fragment was removed.
+        // Inject before tone mapping, while colors are still linear PBR values.
+        .replace('#include <opaque_fragment>',
+          '#include <opaque_fragment>\n' +
+          'vec3 toSky = normalize(vec3(0.0, 17.0, -25.0) - vCinemaWorldPos);\n' +
+          'vec3 visibleFace = normalize(vCinemaWorldNormal) * (gl_FrontFacing ? 1.0 : -1.0);\n' +
+          'float backlit = pow(max(0.0, -dot(visibleFace, toSky)), 1.25);\n' +
+          'float elevation = smoothstep(1.8, 13.0, vCinemaWorldPos.y);\n' +
+          'float distanceToSky = 1.0 - smoothstep(-17.0, 8.0, vCinemaWorldPos.z);\n' +
+          'float thinScatter = backlit * (0.25 + 0.75 * elevation) * (0.40 + 0.60 * distanceToSky);\n' +
+          'float inkDensity = clamp(dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722)) * 1.8, 0.0, 1.0);\n' +
+          'float inkTransmission = mix(0.35, 1.0, inkDensity);\n' +
+          'gl_FragColor.rgb += vec3(0.52, 0.70, 0.75) * thinScatter * inkTransmission * 0.70;');
+      if (sway) shaderRefs.push(shader as unknown as SheetShader);
+    };
+    material.customProgramCacheKey = () => sway ? 'paper-cinema-scatter-sway-v5' : 'paper-cinema-scatter-static-v5';
+    disposable.push(material);
+    return material;
+  });
+  mesh.material = Array.isArray(mesh.material) ? enhanced : enhanced[0];
 }
 
 function configureScene(scene: Object3D, sheetShaders: SheetShader[]) {
@@ -147,8 +196,8 @@ function configureScene(scene: Object3D, sheetShaders: SheetShader[]) {
         phase: n * 2.39996 + (n % 7) * .33,
       });
     }
-    if (/(Layered paper canopy|Continuous medium bowed paper tier|Reference middle-scale crossover sheets|Irregular descending cascade)/i.test(name)) {
-      attachPaperMotion(object, sheetShaders);
+    if (/(Layered paper canopy|Continuous medium bowed paper tier|Reference middle-scale crossover sheets|Irregular descending cascade|Exterior ordinary paper|Reference near-floor sheet)/i.test(name)) {
+      enhanceAirbornePaper(object, sheetShaders, disposable);
     }
   });
   // The source screen's front plate is partly hidden by its chassis from the
@@ -285,18 +334,35 @@ export default function PaperWorld({ stage, quality, reducedMotion, onReady, onA
   return (
     <>
       <color attach="background" args={['#091217']} />
-      <fogExp2 attach="fog" args={['#0b161b', quality === 'cinema' ? 0.025 : 0.018]} />
-      <ambientLight intensity={0.52} color="#aec4c3" />
-      <hemisphereLight args={['#c4e2e5', '#0c1719', 1.0]} />
-      <directionalLight color="#c9eef2" intensity={2.6} position={[-2, 12, -3]} />
-      <directionalLight color="#a7c6ce" intensity={1.1} position={[4, 9, 5]} />
-      <directionalLight color="#bddee0" intensity={0.48} position={[-3, 5, 11]} />
-      <mesh position={[0, 15.8, -23]} renderOrder={-10}>
-        <planeGeometry args={[28, 23]} />
-        <meshBasicMaterial map={skyGlow} transparent opacity={0.78} blending={AdditiveBlending}
-          depthWrite={false} fog={false} toneMapped={false} side={DoubleSide} />
+      <fogExp2 attach="fog" args={['#122a30', quality === 'cinema' ? 0.023 : 0.017]} />
+      {/* Preserve dark faces and walls: the source is above and far BEHIND the paper. */}
+      <ambientLight intensity={0.23} color="#a6bcc2" />
+      <hemisphereLight args={['#bedee6', '#061012', 0.52]} />
+      <directionalLight color="#d1f0f5" intensity={3.5} position={[0, 18, -16]} />
+      <directionalLight color="#8dafb7" intensity={0.37} position={[5, 8, 2]} />
+      <directionalLight color="#b4cbd1" intensity={0.15} position={[-3, 5, 11]} />
+      {/* A bright, physically located source seen through gaps in the paper. */}
+      <mesh position={[0, 17.0, -25.0]} renderOrder={-10}>
+        <planeGeometry args={[32, 29]} />
+        <meshBasicMaterial map={skyGlow} color={SKY_LIGHT_COLOR} transparent opacity={0.96}
+          blending={AdditiveBlending} depthWrite={false} fog={false} toneMapped={false} side={DoubleSide} />
       </mesh>
-      <pointLight color="#ffe4b4" intensity={16} distance={5} decay={2} position={[0, 1.25, -0.8]} />
+      {/* A second, higher cloud of cool light lifts the upper paper canopy. The
+          nearest paper still passes the depth test and reads as a silhouette. */}
+      {quality === 'cinema' && (
+        <mesh position={[0, 23.0, -14.0]} renderOrder={-10}>
+          <planeGeometry args={[24, 18]} />
+          <meshBasicMaterial map={skyGlow} color={SKY_LIGHT_COLOR} transparent opacity={0.64}
+            blending={AdditiveBlending} depthWrite={false} fog={false} toneMapped={false} side={DoubleSide} />
+        </mesh>
+      )}
+      <CinematicAtmosphere frame={frame} reducedMotion={reducedMotion} quality={quality} />
+      <pointLight color="#ffdfab" intensity={9} distance={4.2} decay={2} position={[0, 1.25, -0.8]} />
+      {/* Close paper chapters keep printed content legible without raising all ambient light. */}
+      {stage !== 'intro' && stage !== 'screen' && (
+        <pointLight color="#b4d3d0" intensity={1.75} distance={3.6} decay={2}
+          position={PAPER_FOCUS_LIGHTS[stage]} />
+      )}
       <primitive object={scene} dispose={null} />
       {quality === 'cinema' && (
         <EffectComposer multisampling={0} enableNormalPass={false}>

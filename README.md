@@ -28,6 +28,7 @@ npm run build           # Production build
 npm run preview         # Preview production build, http://127.0.0.1:4173/
 npm run test:smoke      # Desktop browser interaction test (Chrome required)
 npm run test:mobile     # Mobile / reduced-motion / skip test (Chrome required)
+npm run test:lighting   # Verify the compiled paper-translucency and GPU sway shaders
 ```
 
 镜头的八个真实停留段（开场、六张作品纸、电脑）保存于 `public/assets/camera-path.json`。改为只显示前四张纸时仍保留电脑网页中的所有六项成果。浏览器性能依赖硬件和网络，当前未保证任何设备均为 60 FPS。
@@ -49,4 +50,6 @@ Change the name, introduction, paper designs, projects, and links in `src/config
 
 ## Quality notes
 
-Cycles shaders and volumetric effects are not portable to WebGL. The export excludes the two Cycles-only volume bounding boxes and replaces their visual purpose with cheap WebGL fog. The web version approximates the reference through cool rim lighting, warm monitor emission, scene fog, tuned tone-mapping, bloom, vignette, and conservative paper materials. Compare screenshots of the same camera frames to your Cycles references and tune the look further. Performance and appearance vary by device.
+Cycles shaders and true volumetric scattering do not carry over to WebGL. The exporter omits the two Cycles-only volume containers because glTF would turn them into opaque blocking meshes. The current cinematic rig recreates the visual hierarchy with two depth-tested HDR cool light sources, a darker ambient/fill balance, warm monitor emission, fog, Bloom and vignette. Paper background meshes use a small custom PBR fragment modification for view-dependent **thin-sheet backlighting**; printed ink attenuates transmission instead of glowing like a screen. On the current Three.js, this shader patches `opaque_fragment`, not the removed `output_fragment` hook. The glTF custom `_SHEET_PHASE` attribute is exposed to Three.js as lowercase `_sheet_phase`; the code and the browser test verify this mapping so the canopy's GPU motion actually runs. In CINEMA mode, `src/components/CinematicAtmosphere.tsx` adds four depth-tested, slowly varying volume-light curtains with foreground-to-background occlusion. These are cheaper and visually cleaner than a fullscreen ray-blur, which was intentionally removed after it caused duplicate paper silhouettes. LITE mode keeps only the far atmospheric layer and omits full-screen postprocessing.
+
+**Important:** these are artistic real-time approximations, not a pixel-identical reconstruction of the original Cycles volume path-tracing. For closer parity, the next stage would involve Cycles-matched reference frames, static lightmap baking, and/or actual low-resolution volumetric sampling on sufficiently powerful hardware. The current browser tests exercise functionality under software WebGL; they do not establish real-device FPS.
