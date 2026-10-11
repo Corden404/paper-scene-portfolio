@@ -1,0 +1,101 @@
+{
+  "sha256_source": "593a576196e88789ed5eac1af2ed3eedce41377f44ae044ced6bf7a158fa87ba",
+  "metrics": [
+    {
+      "name": "01-opening-portrait",
+      "frame": 25,
+      "mean_luma": 73.8,
+      "upper_mid_lower": [
+        109.9,
+        89.3,
+        22.3
+      ],
+      "black_pct": 31.3,
+      "high_pct": 2.1
+    },
+    {
+      "name": "02-opening-landscape",
+      "frame": 25,
+      "mean_luma": 56.1,
+      "upper_mid_lower": [
+        87.0,
+        65.1,
+        16.4
+      ],
+      "black_pct": 36.6,
+      "high_pct": 1.4
+    },
+    {
+      "name": "03-camera-flight",
+      "frame": 65,
+      "mean_luma": 76.9,
+      "upper_mid_lower": [
+        94.8,
+        84.6,
+        51.2
+      ],
+      "black_pct": 11.9,
+      "high_pct": 0.7
+    },
+    {
+      "name": "04-paper-A",
+      "frame": 109,
+      "mean_luma": 93.1,
+      "upper_mid_lower": [
+        102.3,
+        99.4,
+        77.5
+      ],
+      "black_pct": 7.9,
+      "high_pct": 0.8
+    },
+    {
+      "name": "05-paper-C",
+      "frame": 288,
+      "mean_luma": 77.1,
+      "upper_mid_lower": [
+        81.6,
+        85.4,
+        64.2
+      ],
+      "black_pct": 17.1,
+      "high_pct": 0.0
+    },
+    {
+      "name": "06-paper-D",
+      "frame": 373,
+      "mean_luma": 62.0,
+      "upper_mid_lower": [
+        64.1,
+        67.1,
+        54.7
+      ],
+      "black_pct": 41.2,
+      "high_pct": 0.0
+    },
+    {
+      "name": "07-paper-F",
+      "frame": 540,
+      "mean_luma": 78.3,
+      "upper_mid_lower": [
+        95.4,
+        80.8,
+        58.7
+      ],
+      "black_pct": 23.8,
+      "high_pct": 0.0
+    },
+    {
+      "name": "08-computer-end",
+      "frame": 650,
+      "mean_luma": 128.6,
+      "upper_mid_lower": [
+        58.1,
+        182.5,
+        145.2
+      ],
+      "black_pct": 29.8,
+      "high_pct": 37.1
+    }
+  ]
+}

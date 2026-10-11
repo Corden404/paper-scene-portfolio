@@ -1,0 +1,46 @@
+{
+  "source": {
+    "view": "AgX",
+    "look": "AgX - Medium Low Contrast",
+    "exposure": -0.3499999940395355,
+    "camera": "Portfolio preview camera",
+    "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\paper_portfolio_reference_match_v4.blend",
+    "sha256": "589e3fb26cb03eb12a7a0d75d2b47b72a96c5d913ce2bfd325ccab915ef2f150"
+  },
+  "render": {
+    "size": [
+      1920,
+      1080
+    ],
+    "samples_max": 192,
+    "adaptive_threshold": 0.01,
+    "denoiser": "OPENIMAGEDENOISE",
+    "devices": [
+      {
+        "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "type": "CUDA"
+      }
+    ],
+    "color_management_unchanged": true
+  },
+  "frames": [
+    {
+      "frame": 25,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\New Model Keyframes 2026-10-11\\20261011-053642-281210\\frame_025_opening.png",
+      "bytes": 9027461,
+      "sha256": "9ae347eb356eb7d173215657693df9d3e0d35e4ec9d1fca57633ef48e492bbcb",
+      "seconds": 160.07,
+      "camera": "Portfolio preview camera"
+    },
+    {
+      "frame": 109,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\New Model Keyframes 2026-10-11\\20261011-053642-281210\\frame_109_paper_A.png",
+      "bytes": 7130816,
+      "sha256": "48c48a90e6ea7d35907def23e55eac51fdaedc327f15ecc92789fb34525034f4",
+      "seconds": 166.65,
+      "camera": "Portfolio preview camera"
+    }
+  ],
+  "folder": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\New Model Keyframes 2026-10-11\\20261011-053642-281210",
+  "status": "complete"
+}

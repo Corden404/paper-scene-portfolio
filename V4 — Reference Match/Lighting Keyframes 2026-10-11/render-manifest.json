@@ -1,0 +1,120 @@
+{
+  "source": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\paper_portfolio_reference_match_v4.blend",
+  "source_sha256": "593a576196e88789ed5eac1af2ed3eedce41377f44ae044ced6bf7a158fa87ba",
+  "blender": "5.2.2 LTS",
+  "render_device": "Cycles CUDA RTX 4060 Laptop GPU",
+  "shots": [
+    {
+      "name": "01-opening-portrait",
+      "scene": "V4 Portrait Frame 25",
+      "frame": 25,
+      "resolution": [
+        816,
+        1456
+      ],
+      "samples": 96,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\01-opening-portrait-f025-cycles-cuda-96spp.png",
+      "size_bytes": 5499420,
+      "sha256": "dafb78fb2bbfea5cb9466ae0f1cd35fa0eb84413373fd5fbf433283b2be0adba",
+      "render_seconds": 28.76
+    },
+    {
+      "name": "02-opening-landscape",
+      "scene": "Scene",
+      "frame": 25,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\02-opening-landscape-f025-cycles-cuda-80spp.png",
+      "size_bytes": 3515430,
+      "sha256": "c89e3b8926c9186f7a39f33cdb660c946ae567d9542b6488b90955d9841f60b7",
+      "render_seconds": 15.34
+    },
+    {
+      "name": "03-camera-flight",
+      "scene": "Scene",
+      "frame": 65,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\03-camera-flight-f065-cycles-cuda-80spp.png",
+      "size_bytes": 3512586,
+      "sha256": "56a50ee421dab97279d216273f56696ca48cf08a227934d1bf61b3f90c37f63c",
+      "render_seconds": 15.85
+    },
+    {
+      "name": "04-paper-A",
+      "scene": "Scene",
+      "frame": 109,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\04-paper-A-f109-cycles-cuda-80spp.png",
+      "size_bytes": 3256926,
+      "sha256": "3ee615863217a857f74ffc721369fca43e388d71685a00887d0410ead5c984ca",
+      "render_seconds": 15.33
+    },
+    {
+      "name": "05-paper-C",
+      "scene": "Scene",
+      "frame": 288,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\05-paper-C-f288-cycles-cuda-80spp.png",
+      "size_bytes": 3216513,
+      "sha256": "b41cc75b5aaf57eff59f46bfdaedec52acea935db0851b1acbc5237fdfce6aa5",
+      "render_seconds": 15.6
+    },
+    {
+      "name": "06-paper-D",
+      "scene": "Scene",
+      "frame": 373,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\06-paper-D-f373-cycles-cuda-80spp.png",
+      "size_bytes": 2926770,
+      "sha256": "6cf72ae5d2aec603b59e56364f4be6ad754e8345a0c1145ee3c2c2de54199ea2",
+      "render_seconds": 15.36
+    },
+    {
+      "name": "07-paper-F",
+      "scene": "Scene",
+      "frame": 540,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\07-paper-F-f540-cycles-cuda-80spp.png",
+      "size_bytes": 3180150,
+      "sha256": "92b71a533ff61bc6d1008abb9a2948ccdf651fdf6d124632866ef32b5dd6e76b",
+      "render_seconds": 18.17
+    },
+    {
+      "name": "08-computer-end",
+      "scene": "Scene",
+      "frame": 650,
+      "resolution": [
+        1152,
+        648
+      ],
+      "samples": 80,
+      "file": "G:\\Dev\\Paper Scene\\V4 — Reference Match\\Lighting Keyframes 2026-10-11\\08-computer-end-f650-cycles-cuda-80spp.png",
+      "size_bytes": 2775380,
+      "sha256": "c1ca636879e731996396cca7c333d428a88c8eea083fe6b4b07b1cb1c17b76ba",
+      "render_seconds": 14.64
+    }
+  ]
+}
