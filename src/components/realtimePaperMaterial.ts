@@ -62,13 +62,28 @@ vec3 probeAt(float side, vec2 xy, float frameBase) {
   return texture2D(uIrradiance,(pixel+.5)/uLightingSize).rgb;
 }
 vec3 probe(float side, vec2 xy) {
-  vec3 value = probeAt(side,xy,uFrameBase);
   #ifdef V4_HERO
+    // All paper lighting coefficients are already baked. Select only the
+    // nonzero contributors; these weights are uniform across every fragment.
+    // At any authored frame, at most two of the three bases contribute.
+    if (uFrameBlend >= 1.0 && uFillBlend >= 1.0)
+      return probeAt(side,xy,uFillFrameBase);
+    if (uFrameBlend >= 1.0) {
+      vec3 reading = probeAt(side,xy,uNextFrameBase);
+      if (uFillBlend > 0.0)
+        return reading + (probeAt(side,xy,uFillFrameBase)-reading)*uFillBlend;
+      return reading;
+    }
+    vec3 ambient = probeAt(side,xy,uFrameBase);
+    if (uFrameBlend <= 0.0 && uFillBlend <= 0.0) return ambient;
     vec3 reading = probeAt(side,xy,uNextFrameBase);
-    value = mix(value,reading,uFrameBlend);
-    value += (probeAt(side,xy,uFillFrameBase)-reading)*uFillBlend;
+    vec3 value = mix(ambient,reading,uFrameBlend);
+    if (uFillBlend > 0.0)
+      value += (probeAt(side,xy,uFillFrameBase)-reading)*uFillBlend;
+    return value;
+  #else
+    return probeAt(side,xy,uFrameBase);
   #endif
-  return value;
 }
 vec3 hemisphere(float side) {
   vec2 lightingUv = vUv;
