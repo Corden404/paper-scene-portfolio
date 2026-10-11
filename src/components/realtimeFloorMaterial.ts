@@ -33,13 +33,15 @@ export function configureFloorMaterial(material: MeshStandardMaterial, screen: V
       // rather than a fixed patch on the floor or a screen-space overlay.
       vec2 slope = reflectedRay.xz/max(reflectedRay.y,.04)
                  - screenDirection.xz/max(screenDirection.y,.04);
-      vec2 spread = slope/vec2(.24,1.15);
+      // Longitudinal slope differences grow rapidly at grazing angles;
+      // keep a narrow cross-floor response while letting it reach the viewer.
+      vec2 spread = slope/vec2(.19,4.6);
       float screenLobe = exp(-dot(spread,spread));
       float grain = .5+.5*sin(v4Ground.z*76.0+sin(v4Ground.x*29.0)*2.0);
-      float breakup = .62+.22*sin(v4Ground.z*19.0+v4Ground.x*13.0)+.16*grain;
+      float breakup = .74+.16*sin(v4Ground.z*8.0+v4Ground.x*11.0)+.10*grain;
       float frontOfScreen = smoothstep(-.2,.5,v4Ground.z-v4Screen.z);
       float groundFresnel = .075+.16*pow(1.0-abs(floorView.y),2.0);
-      gl_FragColor.rgb += vec3(1.0,.84,.62)*screenLobe*.28*breakup*frontOfScreen;
+      gl_FragColor.rgb += vec3(1.0,.84,.62)*screenLobe*.24*breakup*frontOfScreen;
       ` + (reflected ? 'gl_FragColor.rgb += max(newMerge.rgb,vec3(0.0))*groundFresnel*(.7+.3*grain);\n' : ''));
   };
   material.customProgramCacheKey = () => `v4-concrete-world-reflection-${reflected ? 'cinema' : 'lite'}`;
