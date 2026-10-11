@@ -52,11 +52,17 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   float jitter = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233))) * 43758.5453);
   float transmission = 1.0;
   vec3 scattering = vec3(0.0);
+  // The authored camera path stays inside this convex box. Once an interior
+  // ray exits it, no later sample can contribute to the volume.
+  bool eyeInside = all(greaterThanEqual(eye,fieldMin)) && all(lessThanEqual(eye,fieldMax));
   for (int i=0; i<48; i++) {
     if (float(i) >= steps) break;
     vec3 p = eye + direction * (float(i)+jitter) * stride;
     vec3 field = (p-fieldMin)/(fieldMax-fieldMin);
-    if (any(lessThan(field,vec3(0.0))) || any(greaterThan(field,vec3(1.0)))) continue;
+    if (any(lessThan(field,vec3(0.0))) || any(greaterThan(field,vec3(1.0)))) {
+      if (eyeInside) break;
+      continue;
+    }
     field = (field*(fieldGrid-1.0)+.5)/fieldGrid;
     vec4 zero = texture(lightZero,field);
     float density = zero.a;
