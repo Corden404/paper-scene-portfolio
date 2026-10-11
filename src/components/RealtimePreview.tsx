@@ -24,6 +24,7 @@ import type { AtmosphereData } from './RealtimeFog';
 import RealtimeGrade from './RealtimeGrade';
 import { createLightingTexture, createPaperMaterial } from './realtimePaperMaterial';
 import type { LightingTexture } from './realtimePaperMaterial';
+import { configureFloorMaterial } from './realtimeFloorMaterial';
 import { createRenderSchedule, FrameSchedule, StaticSceneCache } from './realtimeRenderSchedule';
 import type { RenderSchedule } from './realtimeRenderSchedule';
 import './realtime-preview.css';
@@ -190,36 +191,24 @@ function PaperInstances({ data, binary, textures, lighting, grid }: {
 function ReflectiveFloor({ height, screen }: { height: number; screen: Vector3 }) {
   const floor = useRef<ReflectorMaterial>(null);
   useEffect(() => {
-    const material = floor.current as (ReflectorMaterial & { v4Reflection?: boolean }) | null;
-    if (!material || material.v4Reflection) return;
-    material.v4Reflection = true;
-    const compile = material.onBeforeCompile;
-    material.onBeforeCompile = shader => {
-      compile.call(material, shader);
-      shader.uniforms.v4Screen = { value: screen };
-      shader.vertexShader = 'varying vec3 v4Ground;\n' + shader.vertexShader;
-      shader.vertexShader = shader.vertexShader.replace('#include <worldpos_vertex>',
-        '#include <worldpos_vertex>\nv4Ground = (modelMatrix * vec4(transformed,1.0)).xyz;');
-      shader.fragmentShader = 'uniform vec3 v4Screen;\nvarying vec3 v4Ground;\n' + shader.fragmentShader;
-      // Reflection is a specular contribution, independent of the very dark
-      // concrete's diffuse albedo. The source's warm screen stays visible.
-      shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>',
-        '#include <opaque_fragment>\n' +
-        'float groundFresnel = .13 + .13 * pow(1.0-abs(dot(normal,geometryViewDir)),2.0);\n' +
-        'float mineralGrain = fract(sin(dot(vUv*1800.0,vec2(12.9898,78.233)))*43758.5453);\n' +
-        'vec3 floorView = normalize(cameraPosition-v4Ground);\n' +
-        'vec3 screenDirection = normalize(v4Screen-v4Ground);\n' +
-        'float screenLobe = pow(max(0.0,dot(reflect(-floorView,vec3(0,1,0)),screenDirection)),220.0);\n' +
-        'gl_FragColor.rgb += (newMerge.rgb * groundFresnel + vec3(1.0,.85,.65)*screenLobe*.45) * (.75+.5*mineralGrain);');
-    };
-    material.customProgramCacheKey = () => 'v4-concrete-specular-reflection';
-    material.needsUpdate = true;
+    if (floor.current) configureFloorMaterial(floor.current, screen, true);
   }, [screen]);
   return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, height + .0001, 0]}>
     <planeGeometry args={[36, 42]} />
     <MeshReflectorMaterial ref={floor} resolution={512} blur={[20, 32]} mixBlur={2} mixStrength={.65}
       mirror={0} roughness={.12} metalness={0} color="#070d0f" depthScale={.16}
       minDepthThreshold={.7} maxDepthThreshold={1.4} />
+  </mesh>;
+}
+
+function LiteFloor({ height, screen }: { height: number; screen: Vector3 }) {
+  const floor = useRef<MeshStandardMaterial>(null);
+  useEffect(() => {
+    if (floor.current) configureFloorMaterial(floor.current, screen, false);
+  }, [screen]);
+  return <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, height + .0001, 0]}>
+    <planeGeometry args={[36, 42]} />
+    <meshStandardMaterial ref={floor} color="#070d0f" roughness={.12} metalness={0} />
   </mesh>;
 }
 
@@ -288,14 +277,14 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
           material.customProgramCacheKey = () => 'v4-emission-display';
           material.emissive = new Color('#fff4df');
           material.emissiveMap = monitor;
-          material.emissiveIntensity = 12;
+          material.emissiveIntensity = 6.5;
         } else if (!name.includes('charcoal hall')) {
           // The V4 sky lights exclude furniture. Reduce the realtime rig's
           // direct contribution on the desk while retaining screen bounce.
           material.onBeforeCompile = shader => {
             shader.fragmentShader = shader.fragmentShader.replace(
               'vec3 totalDiffuse = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;',
-              'vec3 totalDiffuse = .5*reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;');
+              'vec3 totalDiffuse = .32*reflectedLight.directDiffuse + .8*reflectedLight.indirectDiffuse;');
           };
           material.customProgramCacheKey = () => 'v4-furniture-light-link-compensation';
         }
@@ -341,9 +330,7 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
       }
     }} />
     {quality === 'cinema' ? <ReflectiveFloor height={room.floorHeight} screen={room.screen} /> :
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, room.floorHeight + .0001, 0]}>
-        <planeGeometry args={[36, 42]} /><meshStandardMaterial color="#070d0f" roughness={.75} metalness={.15} />
-      </mesh>}
+      <LiteFloor height={room.floorHeight} screen={room.screen} />}
   </>;
 }
 
@@ -458,7 +445,7 @@ function World({ bundle, chapter, quality, reducedMotion, jump, schedule, onRead
     <directionalLight position={[-5, 7, 7]} color="#a4c0c5" intensity={.10} />
     <rectAreaLight position={[0, 5.5, 7]} rotation={[-.5, 0, 0]} color="#c2d0d3"
       intensity={chapter === 'intro' ? 0 : .7} width={5} height={5} />
-    <pointLight position={[0, 1, -.7]} color="#ffe5b7" intensity={3.5} distance={4} decay={2} />
+    <pointLight position={[0, 1, -.7]} color="#ffe5b7" intensity={2.4} distance={3.2} decay={2} />
     <mesh position={[-.4, 12.8, -9]} rotation={[-.62, 0, 0]}>
       <planeGeometry args={[9, 8]} />
       <meshBasicMaterial map={glow} color={new Color().setRGB(5.4, 7.1, 7.4)} transparent

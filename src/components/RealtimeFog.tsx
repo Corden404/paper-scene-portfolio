@@ -76,9 +76,12 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
     vec3 direct = min(zero.rgb,sqrt(bx*bx+by*by+bz*bz)/3.0);
     float cosine = dot(direction,axis);
     float hg = (1.0-phase*phase)/pow(1.0+phase*phase-2.0*phase*cosine,1.5);
-    // Match the approved image's veiling light after the finite-grid cosine
-    // approximation, while retaining the original spatial density and phase.
-    vec3 illumination = (max(vec3(0.0),zero.rgb-direct)+direct*hg)*.72;
+    // Keep authored density and directional shafts. Broad isotropic light
+    // veils the pages; weighting it by the field's directional coherence
+    // separates the lit upper volume from the quieter lower hall.
+    float coherence = clamp(length(dominant)/max(dot(zero.rgb,weights)*3.0,.00001),0.0,1.0);
+    float diffuseWeight = mix(.48,.64,coherence);
+    vec3 illumination = max(vec3(0.0),zero.rgb-direct)*diffuseWeight + direct*hg*.76;
     scattering += transmission * loss * albedo * illumination;
     transmission *= 1.0-loss;
   }

@@ -110,7 +110,7 @@ void main() {
   // shell transmit 13 percent; omitting it washes out the foreground pages.
   float shell = .13;
   #ifdef V4_HERO
-    shell = .38;
+    shell = .48;
   #endif
   vec3 irradiance = front*(1.0-through) + back*through*shell;
   vec3 ink = texture2D(uPrint,vUv).rgb;
@@ -119,7 +119,10 @@ void main() {
     ink *= vec3(.85,1.0,1.03);
   #endif
   #ifdef V4_HERO
-    ink *= vec3(.70,.84,.87);
+    // Preserve the baked curvature and reading-light gradient. Neutral
+    // cotton and a little more back-shell light soften the unlit face without
+    // lifting the printed blacks or brightening the instanced background.
+    ink *= vec3(.90,.94,.94);
   #endif
   gl_FragColor = vec4(ink * irradiance,1.0);
   #include <colorspace_fragment>
