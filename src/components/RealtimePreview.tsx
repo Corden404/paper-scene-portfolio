@@ -58,6 +58,14 @@ function loadBundle() {
     fetch('/assets/realtime/scene.json').then(async response => {
       if (!response.ok) throw new Error('The 3D scene could not be loaded.');
       return response.json() as Promise<SceneData>;
+    }).then(data => {
+      // Start the GLB and PNG decoders while the light fields are downloading.
+      // Drei's cache is shared with the matching useGLTF/useTexture calls.
+      useGLTF.preload(`/assets/realtime/room.glb?v=${data.assetVersion}`);
+      useTexture.preload(textureUrls);
+      useTexture.preload(portfolio.monitorImage);
+      useTexture.preload(`/assets/realtime/source-grade.png?v=${data.assetVersion}`);
+      return data;
     }),
     fetch('/assets/realtime/papers.bin').then(async response => {
       if (!response.ok) throw new Error('The paper geometry could not be loaded.');
