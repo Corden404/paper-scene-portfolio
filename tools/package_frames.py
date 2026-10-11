@@ -41,7 +41,7 @@ def finish(image, stage):
     strength = .36 if stage == 'intro' else .20
     values = 1 - (1 - values) * (1 - strength * glow[..., None])
     diffused = Image.fromarray(np.clip(values * 255, 0, 255).astype(np.uint8))
-    return Image.blend(diffused, diffused.filter(ImageFilter.GaussianBlur(width / 1100)), .15)
+    return diffused
 
 
 def package(folder, output):

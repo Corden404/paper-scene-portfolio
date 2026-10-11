@@ -1,7 +1,7 @@
 """Finish and encode real camera flights, including reverse navigation.
 
-Requires Pillow, NumPy and an H.264-capable FFmpeg. The 10 fps Cycles sequence
-is interpolated to 24 fps only between rendered poses; camera geometry is baked.
+Requires Pillow, NumPy and an H.264-capable FFmpeg. Every delivered frame is
+a native-resolution Cycles render. No optical-flow interpolation or upscaling.
 """
 import argparse
 import hashlib
@@ -16,6 +16,7 @@ from package_frames import finish
 
 def package(folder, output, ffmpeg, partial=False):
     receipt=json.loads((folder/'motion-manifest.json').read_text(encoding='utf-8'))
+    if receipt['fps']<24:raise RuntimeError('At least 24 rendered frames per second are required')
     manifest_path=output/'frames.json'
     manifest=json.loads(manifest_path.read_text(encoding='utf-8'))
     if manifest['sourceSha256']!=receipt['source_sha256']:
@@ -28,10 +29,14 @@ def package(folder, output, ffmpeg, partial=False):
         if len(flight['frames'])!=flight['count']:
             if partial:continue
             raise RuntimeError('Incomplete flight: '+key)
-        views=('landscape','portrait') if flight['orientation']=='shared' else (flight['orientation'],)
+        if flight['orientation'] not in ('landscape','portrait'):
+            raise RuntimeError('Render both orientations at their native resolution')
+        views=(flight['orientation'],)
         signature=hashlib.sha256((recipe+json.dumps(flight,sort_keys=True)).encode()).hexdigest()
         for orientation in views:
-            width,height=(960,540) if orientation=='landscape' else (408,728)
+            width,height=(1920,1080) if orientation=='landscape' else (816,1456)
+            if (flight['width'],flight['height'])!=(width,height):
+                raise RuntimeError('Low-resolution flights cannot be upscaled for delivery')
             processed=folder/(key+'-'+orientation+'-finished');processed.mkdir(exist_ok=True)
             for n in range(flight['count']):
                 raw=folder/key/(f'{n:04d}.png')
@@ -39,12 +44,6 @@ def package(folder, output, ffmpeg, partial=False):
                     raise RuntimeError('Render checksum mismatch: '+str(raw))
                 with Image.open(raw) as image:
                     if image.size!=(flight['width'],flight['height']):raise RuntimeError('Wrong size')
-                    if flight['orientation']=='shared':
-                        if orientation=='landscape':
-                            crop_height=round(image.width*9/16)
-                            top=(image.height-crop_height)//2
-                            image=image.crop((0,top,image.width,top+crop_height))
-                        image=image.resize((width,height),Image.Resampling.LANCZOS)
                     result=finish(image,flight['to'])
                     if flight['from']=='intro':
                         result=Image.blend(finish(image,'intro'),result,n/(flight['count']-1))
@@ -55,24 +54,22 @@ def package(folder, output, ffmpeg, partial=False):
                 old=cache.get(name)
                 if not (old and old['signature']==signature and path.exists()
                         and hashlib.sha256(path.read_bytes()).hexdigest()==old['sha256']):
-                    duration=(flight['count']-1)/receipt['fps']+1/24
-                    filters=('tpad=stop_mode=clone:stop_duration=0.3,'
-                        'minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:vsbmc=1,'
-                        f'trim=duration={duration},setpts=PTS-STARTPTS')
-                    if reverse:filters+=',reverse'
+                    filters='reverse,setpts=PTS-STARTPTS' if reverse else 'setpts=PTS-STARTPTS'
                     subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-y','-framerate',str(receipt['fps']),
-                        '-i',str(processed/'%04d.png'),'-vf',filters,'-c:v','libx264','-preset','slow',
-                        '-crf','19','-pix_fmt','yuv420p','-movflags','+faststart','-an',str(path)],check=True)
+                        '-i',str(processed/'%04d.png'),'-vf',filters,'-r',str(receipt['fps']),'-fps_mode','cfr',
+                        '-c:v','libx264','-preset','slow',
+                        '-crf','16','-threads','4','-pix_fmt','yuv420p','-movflags','+faststart','-an',str(path)],check=True)
                 digest=hashlib.sha256(path.read_bytes()).hexdigest()
                 cache[name]={'signature':signature,'sha256':digest}
                 cache_path.write_text(json.dumps(cache,indent=2),encoding='utf-8')
                 flights.setdefault(start+'--'+end,{})[orientation]={
                     'url':'/assets/rendered/'+name+'?v='+digest[:10],'width':width,'height':height,
+                    'frameCount':flight['count'],
                     'sourceFrames':[flight['last'],flight['first']] if reverse else [flight['first'],flight['last']]}
         print('ENCODED',key,flush=True)
     if not partial and (len(flights)!=14 or any(len(v)!=2 for v in flights.values())):
         raise RuntimeError('Expected seven flights in both directions and orientations')
-    manifest['motion']={'fps':24,'renderedFps':receipt['fps'],'flights':flights}
+    manifest['motion']={'fps':receipt['fps'],'renderedFps':receipt['fps'],'interpolated':False,'flights':flights}
     manifest_path.write_text(json.dumps(manifest,indent=2)+'\n',encoding='utf-8')
     print('Packaged',sum(len(v) for v in flights.values()),'camera flights.',flush=True)
 
