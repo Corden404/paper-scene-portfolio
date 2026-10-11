@@ -1,9 +1,7 @@
-import { Canvas } from '@react-three/fiber';
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, ChevronRight, Eye, EyeOff, Monitor, MousePointer2, Volume2 } from 'lucide-react';
-import { Component, Suspense, useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useState } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
-import { ACESFilmicToneMapping, SRGBColorSpace } from 'three';
-import PaperWorld from './components/PaperWorld';
+import RenderedPaperWorld from './components/RenderedPaperWorld';
 import FinalPortfolio from './components/FinalPortfolio';
 import { featuredProjects, portfolio, stages } from './config/portfolio';
 import type { Stage } from './config/portfolio';
@@ -21,7 +19,14 @@ const openingChapter = {
   heading: "IDEAS DON'T\nSTAY ON PAPER.",
   description: 'A quiet space for the things that make us curious. Follow the pages to see what comes next.',
 };
+const screenChapter = {
+  index: '07', eyebrow: 'THE FULL COLLECTION',
+  heading: 'THE WORK\nCOMES INTO VIEW.',
+  description: 'Explore the complete collection on the screen.',
+};
 const lastFeaturedPaper = featuredProjects[featuredProjects.length - 1].id;
+const sceneOnly = new URLSearchParams(window.location.search).get('view') === 'scene';
+const requestedChapter = new URLSearchParams(window.location.search).get('chapter') as Stage;
 
 function useMotionPreferences() {
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -40,13 +45,15 @@ function useMotionPreferences() {
 
 export default function App() {
   const { reducedMotion, mobile } = useMotionPreferences();
-  const [stage, setStage] = useState<Stage>('intro');
+  const [stage, setStage] = useState<Stage>(stages.includes(requestedChapter) ? requestedChapter : 'intro');
   const [quality, setQuality] = useState<'cinema' | 'balanced'>('cinema');
   const [qualityOverridden, setQualityOverridden] = useState(false);
   const [ready, setReady] = useState(false);
   const [moving, setMoving] = useState(false);
+  const [jump, setJump] = useState(false);
   const [webEntered, setWebEntered] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [sceneFailed, setSceneFailed] = useState(false);
   const currentIndex = stages.indexOf(stage);
 
   useEffect(() => {
@@ -54,7 +61,9 @@ export default function App() {
   }, [mobile, reducedMotion, qualityOverridden]);
 
   const onReady = useCallback(() => setReady(true), []);
-  const onAssetError = useCallback((message: string) => setLoadError(message), []);
+  const onAssetError = useCallback((message: string) => {
+    setLoadError(message); setSceneFailed(true); setMoving(false);
+  }, []);
   const onArrive = useCallback((_next: Stage) => {
     setMoving(false);
   }, []);
@@ -62,20 +71,20 @@ export default function App() {
   // Let visitors actually see the physical monitor before the HTML portfolio
   // takes over the frame. The final page then becomes fully accessible DOM.
   useEffect(() => {
-    if (stage !== 'screen' || moving || !ready || webEntered) return;
+    if (sceneOnly || stage !== 'screen' || moving || !ready || webEntered) return;
     const timer = window.setTimeout(() => setWebEntered(true), reducedMotion ? 180 : 1450);
     return () => window.clearTimeout(timer);
   }, [stage, moving, ready, webEntered, reducedMotion]);
 
-  const goTo = useCallback((next: Stage) => {
-    // Jumping to the computer is always allowed, even during a camera move.
-    // The current GSAP segment is cancelled and the existing path is sped up.
+  const goTo = useCallback((next: Stage, skipFlight = false) => {
     if (!ready || loadError || (moving && next !== 'screen')) return;
+    if (sceneFailed) { window.location.reload(); return; }
     if (next === stage) return;
     setWebEntered(false);
+    setJump(skipFlight);
     setStage(next);
     setMoving(true);
-  }, [ready, loadError, moving, stage]);
+  }, [ready, loadError, moving, stage, sceneFailed]);
 
   const next = useCallback(() => {
     const index = stages.indexOf(stage);
@@ -97,8 +106,8 @@ export default function App() {
         next();
       }
       if (event.key === 'ArrowLeft' && !webEntered) { event.preventDefault(); back(); }
-      if (event.key === 'End' && !webEntered) { event.preventDefault(); goTo('screen'); }
-      if (event.key === 'Escape' && webEntered) goTo(lastFeaturedPaper);
+      if (event.key === 'End' && !webEntered) { event.preventDefault(); goTo('screen', true); }
+      if (event.key === 'Escape' && webEntered) goTo(lastFeaturedPaper, true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -110,35 +119,22 @@ export default function App() {
     eyebrow: `${chapterProject.tag} / SELECTED WORK`,
     heading: chapterProject.heroHeading,
     description: chapterProject.summary,
-  } : openingChapter;
+  } : stage === 'screen' ? screenChapter : openingChapter;
   const isIntro = stage === 'intro';
 
   return (
-    <div className={'experience' + (webEntered ? ' experience--web' : '')}>
+    <div className={'experience experience--rendered' + (sceneOnly ? ' experience--scene-only' : '') + (webEntered ? ' experience--web' : '')}>
       <div className="scene-canvas" aria-hidden="true">
         <SceneErrorBoundary onError={onAssetError}>
-          <Canvas
-            dpr={quality === 'cinema' ? [1, 1.65] : [1, 1.1]}
-            frameloop={webEntered ? 'demand' : 'always'}
-            gl={{ alpha: false, antialias: quality === 'balanced', powerPreference: 'high-performance' }}
-            camera={{ position: [0, 1, 10], fov: 50, near: 0.025, far: 180 }}
-            onCreated={({ gl }) => {
-              gl.outputColorSpace = SRGBColorSpace;
-              gl.toneMapping = ACESFilmicToneMapping;
-              gl.toneMappingExposure = 1.08;
-            }}
-          >
-            <Suspense fallback={null}>
-              <PaperWorld
-                stage={stage}
-                quality={quality}
-                reducedMotion={reducedMotion}
-                onReady={onReady}
-                onArrive={onArrive}
-                onAssetError={onAssetError}
-              />
-            </Suspense>
-          </Canvas>
+          <RenderedPaperWorld
+            stage={stage}
+            quality={quality}
+            reducedMotion={reducedMotion}
+            jump={jump}
+            onReady={onReady}
+            onArrive={onArrive}
+            onAssetError={onAssetError}
+          />
         </SceneErrorBoundary>
       </div>
 
@@ -157,14 +153,14 @@ export default function App() {
           <button
             type="button" className="quality-toggle"
             onClick={() => { setQuality(quality === 'cinema' ? 'balanced' : 'cinema'); setQualityOverridden(true); }}
-            title={quality === 'cinema' ? 'Switch to performance mode' : 'Switch to cinematic quality'}
-            aria-label="Toggle rendering quality"
+            title={quality === 'cinema' ? 'Switch to lightweight scenes' : 'Switch to cinematic quality'}
+            aria-label="Toggle image quality"
           >
             {quality === 'cinema' ? <Eye size={17} /> : <EyeOff size={17} />}
             <span>{quality === 'cinema' ? 'CINEMA' : 'LITE'}</span>
           </button>
           <span className="header-divider" />
-          <button type="button" className="text-link" onClick={() => goTo('screen')} disabled={!ready || stage === 'screen'}>
+          <button type="button" className="text-link" onClick={() => goTo('screen', true)} disabled={!ready || stage === 'screen'}>
             SKIP INTRO <ArrowUpRight size={15} />
           </button>
         </div>
@@ -227,15 +223,15 @@ export default function App() {
 
       {loadError && (
         <div className="error-screen" role="alert">
-          <p className="web-eyebrow">SCENE INITIALIZATION</p>
-          <h2>One moment.<br /><em>The scene needs its assets.</em></h2>
+          <p className="web-eyebrow">THE WORLD BETWEEN THE PAGES</p>
+          <h2>One moment.<br /><em>The scene is taking a little longer.</em></h2>
           <p>{loadError}</p>
-          <code>blender --background --python tools/export_scene.py</code>
-          <p className="error-small">The original Blender source is preserved. Refresh after exporting.</p>
+          <button className="next-button" onClick={() => window.location.reload()}>TRY AGAIN</button>
+          <button className="text-link" onClick={() => { setLoadError(''); setReady(true); setWebEntered(true); }}>VIEW THE PORTFOLIO <ArrowUpRight size={15} /></button>
         </div>
       )}
 
-      {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={() => goTo(lastFeaturedPaper)} /></div>}
+      {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={() => goTo(lastFeaturedPaper, true)} /></div>}
       <div className="preload-tag" aria-hidden="true"><ChevronRight size={1} /></div>
     </div>
   );

@@ -20,3 +20,5 @@ public/assets/*.tmp.glb
 .work/
 .plans/
 .trash/
+# Local visual review notes are not website assets.
+design-qa.md

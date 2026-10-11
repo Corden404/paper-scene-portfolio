@@ -104,9 +104,9 @@ export const featuredProjects: PortfolioProject[] = portfolio.projects.slice(
 
 export const stages: Stage[] = ['intro', ...featuredProjects.map((p) => p.id), 'screen'];
 
-// Midpoints of the actual holds in the 672-frame Blender v3 camera Action.
+// V4 keeps the six-paper camera route; the opening matches reference frame 25.
 export const stageFrames: Record<Stage, number> = {
-  intro: 24,
+  intro: 25,
   'paper-a': 109,
   'paper-b': 205,
   'paper-c': 288,

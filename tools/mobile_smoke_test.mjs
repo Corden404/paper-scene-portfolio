@@ -8,7 +8,6 @@ const screenshotDir = path.resolve('.work/screenshots');
 await fs.mkdir(screenshotDir, { recursive: true });
 const browser = await chromium.launch({
   executablePath, headless: true,
-  args: ['--enable-webgl', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
 });
 const errors = [];
 try {
@@ -23,11 +22,12 @@ try {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
   await page.waitForFunction(() => !document.querySelector('.loading-screen'), { timeout: 60000 });
   const hint = await page.locator('.quality-toggle').getAttribute('title');
-  if (!hint?.includes('cinematic quality')) throw new Error('Mobile should default to the balanced rendering mode: ' + hint);
+  if (!hint?.includes('cinematic quality')) throw new Error('Mobile should default to lightweight images: ' + hint);
+  await page.waitForFunction(() => document.querySelector('.rendered-frame')?.currentSrc.includes('intro-portrait-lite') && document.querySelector('.rendered-frame')?.naturalWidth === 612);
   if (await page.locator('.chapter-marker').count() !== 8) throw new Error('Mobile missing six chapter stops');
   await page.screenshot({ path: path.join(screenshotDir, 'six-mobile-intro.png') });
   await page.locator('.chapter-marker').nth(4).click();
-  await page.waitForFunction(() => document.querySelectorAll('.chapter-marker')[4]?.getAttribute('aria-current') === 'step');
+  await page.waitForFunction(() => document.querySelectorAll('.chapter-marker')[4]?.getAttribute('aria-current') === 'step' && document.querySelector('.rendered-frame')?.currentSrc.includes('paper-d-portrait-lite') && !document.querySelector('.scene-copy--moving'));
   await page.screenshot({ path: path.join(screenshotDir, 'six-mobile-paper-d.png') });
   await page.getByRole('button', { name: /SKIP INTRO/ }).click();
   await page.waitForSelector('.portfolio-web', { timeout: 15000 });
@@ -45,7 +45,7 @@ try {
   if (!(await page.getByRole('dialog').isVisible())) throw new Error('Mobile project F modal failed');
   await page.getByRole('dialog').getByRole('button', { name: 'Close project' }).click();
   await page.getByRole('button', { name: /THE SCENE/ }).first().click();
-  await page.waitForFunction(() => document.querySelectorAll('.chapter-marker')[6]?.getAttribute('aria-current') === 'step');
+  await page.waitForFunction(() => document.querySelectorAll('.chapter-marker')[6]?.getAttribute('aria-current') === 'step' && document.querySelector('.rendered-frame')?.currentSrc.includes('paper-f-portrait-lite') && !document.querySelector('.scene-copy--moving'));
   await page.screenshot({ path: path.join(screenshotDir, 'six-mobile-paper-f.png') });
   console.log('SIX MOBILE RETURN TO F OK');
   if (errors.length) throw new Error('Mobile browser errors: ' + errors.join('; '));

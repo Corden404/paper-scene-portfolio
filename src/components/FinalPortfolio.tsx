@@ -1,12 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowLeft, ArrowUpRight, ExternalLink, X } from 'lucide-react';
 import { portfolio } from '../config/portfolio';
 import type { PortfolioProject } from '../config/portfolio';
 
 function ProjectDetail({ project, onClose }: { project: PortfolioProject; onClose: () => void }) {
+  const dialog = useRef<HTMLElement>(null);
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        event.stopPropagation();
+        onClose();
+      }
+      if (event.key === 'Tab' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        const controls = dialog.current?.querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        const first = controls?.[0], last = controls?.[controls.length - 1];
+        if (first && last && (!dialog.current?.contains(document.activeElement)
+          || document.activeElement === (event.shiftKey ? first : last))) {
+          event.preventDefault();
+          (event.shiftKey ? last : first).focus();
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
@@ -15,6 +28,7 @@ function ProjectDetail({ project, onClose }: { project: PortfolioProject; onClos
   return (
     <div className="detail-backdrop" onClick={onClose} role="presentation">
       <section
+        ref={dialog}
         role="dialog" aria-modal="true" aria-labelledby="detail-title"
         className="detail-modal" onClick={(event) => event.stopPropagation()}
       >
@@ -33,7 +47,7 @@ function ProjectDetail({ project, onClose }: { project: PortfolioProject; onClos
         <p className="detail-summary">{project.summary}</p>
         <p className="detail-body">{project.description}</p>
         <div className="detail-tags">{project.keywords.map((keyword) => <span key={keyword}>{keyword}</span>)}</div>
-        <p className="detail-footnote">Demo content — edit src/config/portfolio.ts to replace with your real work.</p>
+        <p className="detail-footnote">Demonstration project — illustrative content.</p>
       </section>
     </div>
   );
@@ -43,6 +57,7 @@ type Props = { onRevisit: () => void };
 
 export default function FinalPortfolio({ onRevisit }: Props) {
   const [selected, setSelected] = useState<PortfolioProject | null>(null);
+  const detailTrigger = useRef<HTMLButtonElement | null>(null);
   const contact = Boolean(portfolio.email || portfolio.github);
 
   return (
@@ -89,7 +104,7 @@ export default function FinalPortfolio({ onRevisit }: Props) {
             {portfolio.projects.map((project) => (
               <button
                 className="project-card" type="button" key={project.id}
-                onClick={() => setSelected(project)}
+                onClick={(event) => { detailTrigger.current = event.currentTarget; setSelected(project); }}
                 aria-label={'Open ' + project.title.replace('\n', ' ')}
               >
                 <span className={'project-card__visual project-card__visual--' + project.style} style={{ background: project.accent }}>
@@ -132,7 +147,9 @@ export default function FinalPortfolio({ onRevisit }: Props) {
           </div>
         </footer>
       </main>
-      {selected && <ProjectDetail project={selected} onClose={() => setSelected(null)} />}
+      {selected && <ProjectDetail project={selected} onClose={() => {
+        setSelected(null); detailTrigger.current?.focus();
+      }} />}
     </div>
   );
 }

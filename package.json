@@ -10,7 +10,8 @@
     "test:smoke": "node tools/smoke_test.mjs",
     "test:mobile": "node tools/mobile_smoke_test.mjs",
     "test:config": "node tools/verify_config.mjs",
-    "test:lighting": "node tools/lighting_smoke_test.mjs",
+    "test:frames": "node tools/frames_smoke_test.mjs",
+    "verify:frames": "python tools/verify_frames.py",
     "verify:scene": "python tools/verify_export.py"
   },
   "dependencies": {

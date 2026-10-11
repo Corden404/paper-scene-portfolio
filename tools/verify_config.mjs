@@ -4,7 +4,7 @@ import ts from 'typescript';
 
 const original = await fs.readFile(new URL('../src/config/portfolio.ts', import.meta.url), 'utf8');
 const setting = /featuredPaperCount:\s*6,/;
-if (!setting.test(original)) throw new Error('The test expects v3 to feature six papers by default');
+if (!setting.test(original)) throw new Error('The test expects six papers by default');
 
 async function readRoute(count) {
   // Compile an in-memory config variation. Never modify the working tree.

@@ -1,0 +1,412 @@
+{
+  "version": "V4",
+  "sourceSha256": "f9632b3c02c2539e26f0a5ef696db7c60b6221d726a9d8b7f257479e7e1acd4c",
+  "frames": {
+    "intro": {
+      "landscape": {
+        "cinema": "/assets/rendered/intro-landscape.webp?v=ea7724cfbd",
+        "lite": "/assets/rendered/intro-landscape-lite.webp?v=fdc20f7675",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 25,
+      "portrait": {
+        "cinema": "/assets/rendered/intro-portrait.webp?v=27b0a4fe95",
+        "lite": "/assets/rendered/intro-portrait-lite.webp?v=654a761ed9",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-a": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-a-landscape.webp?v=cf7ae5160c",
+        "lite": "/assets/rendered/paper-a-landscape-lite.webp?v=81a5f6bf55",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 109,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-a-portrait.webp?v=a8a81f629d",
+        "lite": "/assets/rendered/paper-a-portrait-lite.webp?v=676dd7327f",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-b": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-b-landscape.webp?v=55feb67023",
+        "lite": "/assets/rendered/paper-b-landscape-lite.webp?v=f7adada3fa",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 205,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-b-portrait.webp?v=3c722ab984",
+        "lite": "/assets/rendered/paper-b-portrait-lite.webp?v=749338b719",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-c": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-c-landscape.webp?v=2bedf435f8",
+        "lite": "/assets/rendered/paper-c-landscape-lite.webp?v=d58174cd4d",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 288,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-c-portrait.webp?v=b48275b98c",
+        "lite": "/assets/rendered/paper-c-portrait-lite.webp?v=f135a619ec",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-d": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-d-landscape.webp?v=ce1fecfcd5",
+        "lite": "/assets/rendered/paper-d-landscape-lite.webp?v=3a11609e7e",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 372,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-d-portrait.webp?v=ff3d8b589d",
+        "lite": "/assets/rendered/paper-d-portrait-lite.webp?v=d543be4318",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-e": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-e-landscape.webp?v=1406811437",
+        "lite": "/assets/rendered/paper-e-landscape-lite.webp?v=672ea5148b",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 456,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-e-portrait.webp?v=dc2af5f9bb",
+        "lite": "/assets/rendered/paper-e-portrait-lite.webp?v=9681d27160",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "paper-f": {
+      "landscape": {
+        "cinema": "/assets/rendered/paper-f-landscape.webp?v=5ca7bb74e0",
+        "lite": "/assets/rendered/paper-f-landscape-lite.webp?v=79f3322dae",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 541,
+      "portrait": {
+        "cinema": "/assets/rendered/paper-f-portrait.webp?v=fa83475a81",
+        "lite": "/assets/rendered/paper-f-portrait-lite.webp?v=ea9c34beb7",
+        "width": 816,
+        "height": 1456
+      }
+    },
+    "screen": {
+      "landscape": {
+        "cinema": "/assets/rendered/screen-landscape.webp?v=24a0491103",
+        "lite": "/assets/rendered/screen-landscape-lite.webp?v=d8acff97a3",
+        "width": 1920,
+        "height": 1080
+      },
+      "frame": 654,
+      "portrait": {
+        "cinema": "/assets/rendered/screen-portrait.webp?v=16a77d560b",
+        "lite": "/assets/rendered/screen-portrait-lite.webp?v=8ca10bdda2",
+        "width": 816,
+        "height": 1456
+      }
+    }
+  },
+  "motion": {
+    "fps": 24,
+    "renderedFps": 10,
+    "flights": {
+      "intro--paper-a": {
+        "landscape": {
+          "url": "/assets/rendered/intro--paper-a-landscape.mp4?v=e55eace9ce",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            25,
+            109
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/intro--paper-a-portrait.mp4?v=5f6825b890",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            25,
+            109
+          ]
+        }
+      },
+      "paper-a--intro": {
+        "landscape": {
+          "url": "/assets/rendered/paper-a--intro-landscape.mp4?v=b2572c8e13",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            109,
+            25
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-a--intro-portrait.mp4?v=6ce9ba2a89",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            109,
+            25
+          ]
+        }
+      },
+      "paper-a--paper-b": {
+        "landscape": {
+          "url": "/assets/rendered/paper-a--paper-b-landscape.mp4?v=0db8327e0f",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            109,
+            205
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-a--paper-b-portrait.mp4?v=7d25e14705",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            109,
+            205
+          ]
+        }
+      },
+      "paper-b--paper-a": {
+        "landscape": {
+          "url": "/assets/rendered/paper-b--paper-a-landscape.mp4?v=7e17b8f13f",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            205,
+            109
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-b--paper-a-portrait.mp4?v=67196560e3",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            205,
+            109
+          ]
+        }
+      },
+      "paper-b--paper-c": {
+        "landscape": {
+          "url": "/assets/rendered/paper-b--paper-c-landscape.mp4?v=9fa8c7bceb",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            205,
+            288
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-b--paper-c-portrait.mp4?v=9aeabf3dd4",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            205,
+            288
+          ]
+        }
+      },
+      "paper-c--paper-b": {
+        "landscape": {
+          "url": "/assets/rendered/paper-c--paper-b-landscape.mp4?v=2b48ccafab",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            288,
+            205
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-c--paper-b-portrait.mp4?v=eb51eea8bd",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            288,
+            205
+          ]
+        }
+      },
+      "paper-c--paper-d": {
+        "landscape": {
+          "url": "/assets/rendered/paper-c--paper-d-landscape.mp4?v=d7f9df1d70",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            288,
+            372
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-c--paper-d-portrait.mp4?v=60c839d36e",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            288,
+            372
+          ]
+        }
+      },
+      "paper-d--paper-c": {
+        "landscape": {
+          "url": "/assets/rendered/paper-d--paper-c-landscape.mp4?v=e3189b7460",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            372,
+            288
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-d--paper-c-portrait.mp4?v=ef12d07396",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            372,
+            288
+          ]
+        }
+      },
+      "paper-d--paper-e": {
+        "landscape": {
+          "url": "/assets/rendered/paper-d--paper-e-landscape.mp4?v=40fc88193b",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            372,
+            456
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-d--paper-e-portrait.mp4?v=a2ebd6a710",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            372,
+            456
+          ]
+        }
+      },
+      "paper-e--paper-d": {
+        "landscape": {
+          "url": "/assets/rendered/paper-e--paper-d-landscape.mp4?v=065136ba98",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            456,
+            372
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-e--paper-d-portrait.mp4?v=3015ba5ed9",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            456,
+            372
+          ]
+        }
+      },
+      "paper-e--paper-f": {
+        "landscape": {
+          "url": "/assets/rendered/paper-e--paper-f-landscape.mp4?v=9f5727dccb",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            456,
+            541
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-e--paper-f-portrait.mp4?v=db428fa17a",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            456,
+            541
+          ]
+        }
+      },
+      "paper-f--paper-e": {
+        "landscape": {
+          "url": "/assets/rendered/paper-f--paper-e-landscape.mp4?v=5813c4c01b",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            541,
+            456
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-f--paper-e-portrait.mp4?v=5f80895b4e",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            541,
+            456
+          ]
+        }
+      },
+      "paper-f--screen": {
+        "landscape": {
+          "url": "/assets/rendered/paper-f--screen-landscape.mp4?v=2777b075fb",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            541,
+            654
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/paper-f--screen-portrait.mp4?v=889ee611cc",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            541,
+            654
+          ]
+        }
+      },
+      "screen--paper-f": {
+        "landscape": {
+          "url": "/assets/rendered/screen--paper-f-landscape.mp4?v=83423b0a60",
+          "width": 960,
+          "height": 540,
+          "sourceFrames": [
+            654,
+            541
+          ]
+        },
+        "portrait": {
+          "url": "/assets/rendered/screen--paper-f-portrait.mp4?v=0c640ca2e9",
+          "width": 408,
+          "height": 728,
+          "sourceFrames": [
+            654,
+            541
+          ]
+        }
+      }
+    }
+  }
+}
