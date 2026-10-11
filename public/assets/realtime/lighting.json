@@ -1,0 +1,1 @@
+{"version":2,"sourceSha256":"f9632b3c02c2539e26f0a5ef696db7c60b6221d726a9d8b7f257479e7e1acd4c","papers":10436,"bakedPapers":10436,"grid":[3,5],"sides":2,"format":"float16-rgb","uvInset":0.025,"samples":64,"lighting":"Cycles diffuse direct and indirect hemisphere irradiance","colorGrade":{"url":"source-grade.png","size":48,"logMin":-12.0,"logMax":6.0},"seconds":33.97}

@@ -1,3 +1,5 @@
+> The default website now uses the complete realtime 3D journey. See [the realtime guide](REALTIME.md) for preview controls, editable paper/screen content and asset rebuilding. The sections below describe the original rendered version, available with `?render=video`.
+
 # Paper Scene — V4 rendered portfolio
 
 An immersive six-paper portfolio built from the V4 Blender scene. Cycles renders preserve the thin paper, transmitted light, volumetric haze and warm screen reflections. Real camera flights connect eight reading stops, ending at an interactive HTML portfolio.

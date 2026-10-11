@@ -12,7 +12,8 @@
     "test:config": "node tools/verify_config.mjs",
     "test:frames": "node tools/frames_smoke_test.mjs",
     "verify:frames": "python tools/verify_frames.py",
-    "verify:scene": "python tools/verify_export.py"
+    "verify:scene": "python tools/verify_export.py",
+    "verify:realtime": "python tools/verify_realtime.py"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

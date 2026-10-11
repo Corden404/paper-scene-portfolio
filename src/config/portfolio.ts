@@ -20,6 +20,9 @@ export interface PortfolioProject {
   keywords: string[];
   style: ProjectStyle;
   accent: string;
+  // Enable this when replacing the authored paper ink with the project's
+  // config-driven print layout. Geometry and baked illumination stay intact.
+  editablePrint?: boolean;
 }
 
 export const portfolio = {
@@ -29,7 +32,10 @@ export const portfolio = {
   headline: ['NOT EVERYTHING', 'STAYS ON', 'PAPER.'],
   introduction: 'A journey through ideas, experiments, and the work that makes them real.',
   email: '',
-  github: '',
+  github: 'https://github.com/Corden404',
+  // The physical monitor displays this local profile capture; its link opens
+  // the live GitHub page. Paper ink remains the authored Blender artwork.
+  monitorImage: '/assets/realtime/github-profile.png',
   // Set this to 1–6 to showcase fewer papers. Visitors can always skip to the
   // computer; the full catalogue below still shows all six listed projects.
   featuredPaperCount: 6,
