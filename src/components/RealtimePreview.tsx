@@ -581,7 +581,7 @@ export default function RealtimePreview() {
     return () => window.removeEventListener('keydown', onKey);
   }, [goTo, index, revisitScene, webEntered]);
   const heading = project ? project.heroHeading : chapter === 'screen' ? 'THE WORK\nCOMES INTO VIEW.' : "IDEAS DON'T\nSTAY ON PAPER.";
-  return <div className={`experience experience--rendered realtime-preview${sceneOnly ? ' experience--scene-only' : ''}${webEntered ? ' experience--web' : ''}`}>
+  return <div className={`experience experience--rendered realtime-preview${sceneOnly && !webEntered ? ' experience--scene-only' : ''}${webEntered ? ' experience--web' : ''}`}>
     <div className="scene-canvas" aria-hidden="true" onClick={() => {
       if (!sceneOnly && chapter !== 'screen') goTo(chapters[index + 1]);
     }}>
