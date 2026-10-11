@@ -27,6 +27,8 @@ import type { LightingTexture } from './realtimePaperMaterial';
 import { configureFloorMaterial } from './realtimeFloorMaterial';
 import { createRenderSchedule, FrameSchedule, StaticSceneCache } from './realtimeRenderSchedule';
 import type { RenderSchedule } from './realtimeRenderSchedule';
+import { applyNavigation, cameraProjection, createResourceCache, requestNavigation, startBoundedLoad } from './realtimeJourney';
+import type { NavigationRequest } from './realtimeJourney';
 import './realtime-preview.css';
 
 RectAreaLightUniformsLib.init();
@@ -53,13 +55,25 @@ const sceneOnly = params.get('view') === 'scene';
 const still = params.get('still') === '1';
 const requested = params.get('chapter') as Chapter;
 const textureUrls = Array.from({ length: 7 }, (_, i) => `/assets/realtime/cotton-print-${i + 1}.png`);
-let bundlePromise: Promise<SceneBundle> | undefined;
-function loadBundle() {
-  return bundlePromise ??= Promise.all([
-    fetch('/assets/realtime/scene.json').then(async response => {
+const resourceCache = createResourceCache();
+let preloadedVersion: string | undefined;
+function loadBundle(signal: AbortSignal, onProgress: (completed: number) => void) {
+  let completed = 0;
+  async function resource<T>(url: string, decode: (response: Response) => Promise<T>) {
+    const value = await resourceCache.load(url, async () => {
+      const response = await fetch(url, { signal });
+      return decode(response);
+    });
+    if (!signal.aborted) onProgress(++completed);
+    return value;
+  }
+  return Promise.all([
+    resource('/assets/realtime/scene.json', async response => {
       if (!response.ok) throw new Error('The 3D scene could not be loaded.');
       return response.json() as Promise<SceneData>;
     }).then(data => {
+      if (signal.aborted) throw new Error('Scene loading cancelled.');
+      preloadedVersion = data.assetVersion;
       // Start the GLB and PNG decoders while the light fields are downloading.
       // Drei's cache is shared with the matching useGLTF/useTexture calls.
       useGLTF.preload(`/assets/realtime/room.glb?v=${data.assetVersion}`);
@@ -68,31 +82,31 @@ function loadBundle() {
       useTexture.preload(`/assets/realtime/source-grade.png?v=${data.assetVersion}`);
       return data;
     }),
-    fetch('/assets/realtime/papers.bin').then(async response => {
+    resource('/assets/realtime/papers.bin', async response => {
       if (!response.ok) throw new Error('The paper geometry could not be loaded.');
       return response.arrayBuffer();
     }),
-    fetch('/assets/realtime/lighting.json').then(async response => {
+    resource('/assets/realtime/lighting.json', async response => {
       if (!response.ok) throw new Error('The scene lighting could not be loaded.');
       return response.json() as Promise<LightingData>;
     }),
-    fetch('/assets/realtime/lighting.bin').then(async response => {
+    resource('/assets/realtime/lighting.bin', async response => {
       if (!response.ok) throw new Error('The surface lighting could not be loaded.');
       return response.arrayBuffer();
     }),
-    fetch('/assets/realtime/atmosphere.json').then(async response => {
+    resource('/assets/realtime/atmosphere.json', async response => {
       if (!response.ok) throw new Error('The atmosphere could not be loaded.');
       return response.json() as Promise<AtmosphereData>;
     }),
-    fetch('/assets/realtime/atmosphere.bin').then(async response => {
+    resource('/assets/realtime/atmosphere.bin', async response => {
       if (!response.ok) throw new Error('The atmosphere lighting could not be loaded.');
       return response.arrayBuffer();
     }),
-    fetch('/assets/realtime/hero-lighting.json').then(async response => {
+    resource('/assets/realtime/hero-lighting.json', async response => {
       if (!response.ok) throw new Error('The paper lighting could not be loaded.');
       return response.json() as Promise<HeroLightingData>;
     }),
-    fetch('/assets/realtime/hero-lighting.bin').then(async response => {
+    resource('/assets/realtime/hero-lighting.bin', async response => {
       if (!response.ok) throw new Error('The paper illumination could not be loaded.');
       return response.arrayBuffer();
     }),
@@ -334,14 +348,15 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
   </>;
 }
 
-function World({ bundle, chapter, quality, reducedMotion, jump, schedule, onReady, onArrive, onOpenScreen }: {
-  bundle: SceneBundle; chapter: Chapter; quality: Quality;
+function World({ bundle, navigation, quality, reducedMotion, schedule, onReady, onArrive, onOpenScreen }: {
+  bundle: SceneBundle; navigation: NavigationRequest<Chapter>; quality: Quality;
   schedule: RenderSchedule;
-  reducedMotion: boolean; jump: boolean; onReady: () => void; onArrive: () => void; onOpenScreen: () => void;
+  reducedMotion: boolean; onReady: () => void; onArrive: () => void; onOpenScreen: () => void;
 }) {
   const { camera, size, gl, invalidate } = useThree();
   const light = useRef<DirectionalLight>(null);
-  const frame = useRef(bundle.data.stops[chapters.includes(requested) ? requested : 'intro']);
+  const chapter = navigation.chapter;
+  const frame = useRef(bundle.data.stops[chapter]);
   const flight = useRef<{ from: number; to: number; elapsed: number; duration: number } | null>(null);
   const textures = useTexture(textureUrls);
   const lighting = useMemo(() => createLightingTexture(bundle.lightBinary), [bundle.lightBinary]);
@@ -373,11 +388,10 @@ function World({ bundle, chapter, quality, reducedMotion, jump, schedule, onRead
   useEffect(() => {
     schedule.warmFrames = 3;
     invalidate();
-    const target = bundle.data.stops[chapter];
-    if (Math.abs(target - frame.current) < .01) { onArrive(); return; }
-    if (reducedMotion || jump) { frame.current = target; flight.current = null; onArrive(); return; }
-    flight.current = { from: frame.current, to: target, elapsed: 0, duration: Math.min(8, Math.abs(target - frame.current) / 28) };
-  }, [bundle.data.stops, chapter, invalidate, jump, onArrive, reducedMotion, schedule]);
+    const next = applyNavigation(navigation, frame.current, bundle.data.stops, reducedMotion);
+    frame.current = next.frame; flight.current = next.flight;
+    if (!next.flight) onArrive();
+  }, [bundle.data.stops, invalidate, navigation, onArrive, reducedMotion, schedule]);
 
   useFrame((state, delta) => {
     if (!ready.current) { ready.current = true; onReady(); }
@@ -400,12 +414,17 @@ function World({ bundle, chapter, quality, reducedMotion, jump, schedule, onRead
     const aspect = size.width / size.height;
     const lens = MathUtils.lerp(aspect >= 1 ? from.landscapeLens : from.portraitLens,
       aspect >= 1 ? to.landscapeLens : to.portraitLens, blend);
-    // Match the original image's cover crop at unusual screen ratios, while
-    // keeping the authored horizontal field of view for its native formats.
-    const coverAspect = Math.max(aspect, aspect >= 1 ? 16 / 9 : 816 / 1456);
-    const fov = MathUtils.radToDeg(2 * Math.atan(bundle.data.camera.sensorWidth / (2 * lens * coverAspect)));
+    const projection = cameraProjection(size.width, size.height, lens, bundle.data.camera.sensorWidth, frame.current, bundle.data.stops);
     const perspective = camera as PerspectiveCamera;
-    if (Math.abs(perspective.fov - fov) > .001) { perspective.fov = fov; perspective.updateProjectionMatrix(); }
+    const offset = perspective.view?.enabled ? perspective.view.offsetY : 0;
+    if (Math.abs(perspective.fov - projection.fov) > 1e-8 || Math.abs(perspective.zoom - projection.zoom) > 1e-8 ||
+        Math.abs(offset - projection.offsetY) > 1e-8 || (perspective.view?.enabled &&
+        (perspective.view.fullWidth !== size.width || perspective.view.fullHeight !== size.height))) {
+      perspective.fov = projection.fov; perspective.zoom = projection.zoom;
+      if (projection.offsetY) perspective.setViewOffset(size.width, size.height, 0, projection.offsetY, size.width, size.height);
+      else perspective.clearViewOffset();
+      perspective.updateProjectionMatrix();
+    }
     let settling = false;
     if (!still && !reducedMotion && !flight.current) {
       const targetX = state.pointer.x * .010, targetY = state.pointer.y * .006;
@@ -474,33 +493,72 @@ class PreviewBoundary extends Component<{ children: ReactNode; onError: (message
 export default function RealtimePreview() {
   const schedule = useMemo(createRenderSchedule, []);
   const [bundle, setBundle] = useState<SceneBundle>();
-  const [chapter, setChapter] = useState<Chapter>(chapters.includes(requested) ? requested : 'intro');
+  const [navigation, setNavigation] = useState<NavigationRequest<Chapter>>({ chapter: chapters.includes(requested) ? requested : 'intro', instant: false, id: 0 });
+  const chapter = navigation.chapter;
   const [ready, setReady] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [jump, setJump] = useState(false);
-  const [webEntered, setWebEntered] = useState(false);
+  const [webEntered, setWebEntered] = useState(params.get('view') === 'collection');
+  const [attemptId, setAttemptId] = useState(0);
   const [error, setError] = useState('');
+  const [completed, setCompleted] = useState(0);
+  const presentation = useRef<{ resolve: () => void; reject: (error: Error) => void }>();
+  const readyRef = useRef(false);
   const [quality, setQuality] = useState<Quality>(() => window.innerWidth < 720 ? 'balanced' : 'cinema');
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const onReady = useCallback(() => setReady(true), []);
+  const onReady = useCallback(() => { readyRef.current = true; setReady(true); presentation.current?.resolve(); }, []);
   const onArrive = useCallback(() => setMoving(false), []);
-  const onError = useCallback((message: string) => { setError(message); setMoving(false); }, []);
+  const onError = useCallback((message: string) => {
+    setError(message); setMoving(false);
+    presentation.current?.reject(new Error(message));
+  }, []);
   const index = chapters.indexOf(chapter);
   const project = portfolio.projects.find(project => project.id === chapter);
   const goTo = useCallback((next: Chapter, skipFlight = false) => {
     if (!ready || error || (moving && !skipFlight)) return;
     setWebEntered(false);
-    if (chapter === next && !moving) return;
-    setJump(skipFlight); setMoving(!reducedMotion && !skipFlight); setChapter(next);
+    setMoving(!reducedMotion && !skipFlight && next !== chapter);
+    setNavigation(previous => requestNavigation(previous, next, skipFlight));
   }, [chapter, error, moving, ready, reducedMotion]);
+  const openCollection = useCallback(() => setWebEntered(true), []);
+  const retryScene = useCallback(() => {
+    // Explicit error retry also evicts logically invalid completed core data.
+    // The cache epoch prevents a late previous attempt from restoring stale data.
+    // Ordinary collection revisits retain successful data and decoder caches.
+    if (error) {
+      resourceCache.invalidate();
+      useTexture.clear(textureUrls);
+      useTexture.clear(portfolio.monitorImage);
+      const version = bundle?.data.assetVersion ?? preloadedVersion;
+      if (version) {
+        useGLTF.clear(`/assets/realtime/room.glb?v=${version}`);
+        useTexture.clear(`/assets/realtime/source-grade.png?v=${version}`);
+      }
+    }
+    readyRef.current = false; setReady(false); setError(''); setBundle(undefined);
+    setWebEntered(false); setAttemptId(value => value + 1);
+  }, [bundle, error]);
+  const revisitScene = useCallback(() => {
+    setNavigation(previous => requestNavigation(previous, chapters[chapters.length - 2], true));
+    if (!ready || error) retryScene();
+    else { setMoving(false); setWebEntered(false); }
+  }, [error, ready, retryScene]);
   const onOpenScreen = useCallback(() => {
     if (chapter === 'screen' && ready && !moving) window.open(portfolio.github, '_blank', 'noopener,noreferrer');
   }, [chapter, moving, ready]);
   useEffect(() => {
+    if (webEntered || readyRef.current) return;
     let active = true;
-    void loadBundle().then(value => { if (active) setBundle(value); }).catch(err => { if (active) onError(String(err.message)); });
-    return () => { active = false; };
-  }, [onError]);
+    setCompleted(0);
+    const attempt = startBoundedLoad(async signal => {
+      const value = await loadBundle(signal, count => { if (active) setCompleted(count); });
+      if (!active || signal.aborted) return;
+      const presented = new Promise<void>((resolve, reject) => { presentation.current = { resolve, reject }; });
+      setBundle(value);
+      await presented;
+    }, 25000);
+    void attempt.promise.catch(err => { if (active) onError(err instanceof Error ? err.message : String(err)); });
+    return () => { active = false; attempt.cancel(); presentation.current = undefined; };
+  }, [attemptId, onError, webEntered]);
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const update = () => setReducedMotion(media.matches);
@@ -510,31 +568,31 @@ export default function RealtimePreview() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (document.querySelector('[role="dialog"]') || (event.target as HTMLElement).closest('button,a,input,textarea')) return;
-      if (event.key === 'Escape' && webEntered) { goTo(chapters[chapters.length - 2], true); return; }
+      if (event.key === 'Escape' && webEntered) { revisitScene(); return; }
       if (webEntered) return;
       if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'Enter') {
         event.preventDefault(); goTo(chapters[Math.min(index + 1, chapters.length - 1)]);
       }
       if (event.key === 'ArrowLeft') { event.preventDefault(); goTo(chapters[Math.max(0, index - 1)]); }
-      if (event.key === 'Home') { event.preventDefault(); goTo('intro'); }
+      if (event.key === 'Home') { event.preventDefault(); goTo('intro', true); }
       if (event.key === 'End') { event.preventDefault(); goTo('screen', true); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [goTo, index, webEntered]);
+  }, [goTo, index, revisitScene, webEntered]);
   const heading = project ? project.heroHeading : chapter === 'screen' ? 'THE WORK\nCOMES INTO VIEW.' : "IDEAS DON'T\nSTAY ON PAPER.";
   return <div className={`experience experience--rendered realtime-preview${sceneOnly ? ' experience--scene-only' : ''}${webEntered ? ' experience--web' : ''}`}>
     <div className="scene-canvas" aria-hidden="true" onClick={() => {
       if (!sceneOnly && chapter !== 'screen') goTo(chapters[index + 1]);
     }}>
-      {bundle && <PreviewBoundary onError={onError}>
+      {bundle && !error && (ready || !webEntered) && <PreviewBoundary key={attemptId} onError={onError}>
         <Canvas frameloop="demand" dpr={quality === 'cinema' ? [1, 1.25] : [0.75, 1]}
           gl={{ antialias: false, powerPreference: 'high-performance', toneMapping: AgXToneMapping, toneMappingExposure: .9 }}
           onCreated={({ gl }) => { gl.info.autoReset = false; }}
           camera={{ near: .025, far: 55, position: [0, 2, 8] }}>
           <FrameSchedule active={!webEntered} quality={quality} schedule={schedule} />
           <Suspense fallback={null}>
-            <World bundle={bundle} chapter={chapter} quality={quality} reducedMotion={reducedMotion} jump={jump} schedule={schedule} onReady={onReady} onArrive={onArrive} onOpenScreen={onOpenScreen} />
+            <World bundle={bundle} navigation={navigation} quality={quality} reducedMotion={reducedMotion} schedule={schedule} onReady={onReady} onArrive={onArrive} onOpenScreen={onOpenScreen} />
           </Suspense>
         </Canvas>
       </PreviewBoundary>}
@@ -542,27 +600,29 @@ export default function RealtimePreview() {
     <header className={`site-header${webEntered ? ' site-header--hidden' : ''}`}>
       <div className="brand"><span className="brand-icon">{portfolio.monogram}</span><span className="brand-label">PAPER SCENE<small>LIGHT, PAPER & SPACE</small></span></div>
       <div className="header-actions">
+        <button type="button" className="text-link collection-link" onClick={openCollection}>COLLECTION <ArrowUpRight size={14} /></button>
         <span className="realtime-indicator"><i /> LIVE 3D</span>
         <button className="quality-toggle" onClick={() => setQuality(quality === 'cinema' ? 'balanced' : 'cinema')} aria-label="Toggle 3D quality"
           aria-pressed={quality === 'cinema'} title={quality === 'cinema' ? 'Cinema quality · switch to Lite' : 'Lite quality · switch to Cinema'}>
           {quality === 'cinema' ? <Eye size={16} /> : <EyeOff size={16} />}<span>{quality === 'cinema' ? 'CINEMA' : 'LITE'}</span>
         </button>
-        <button className="text-link" type="button" disabled={!ready || chapter === 'screen'} onClick={() => goTo('screen', true)}>SKIP INTRO <ArrowUpRight size={14} /></button>
-        <a className="text-link realtime-reference" href={`/?render=video&view=scene&chapter=${chapter}`} target="_blank" rel="noreferrer">ORIGINAL <ArrowUpRight size={14} /></a>
+        <button className="text-link" type="button" aria-label="Skip to the GitHub screen" disabled={!ready || chapter === 'screen'} onClick={() => goTo('screen', true)}><span className="skip-label">SKIP INTRO</span><ArrowUpRight size={14} /></button>
+        <a className="text-link realtime-reference" href={`/?render=video&view=scene&chapter=${chapter}`} target="_blank" rel="noreferrer" aria-label="Open the original rendered scene"><span className="reference-label">ORIGINAL</span><ArrowUpRight size={14} /></a>
       </div>
     </header>
     {!webEntered && <div className={`scene-copy scene-copy--${chapter}${project ? ' scene-copy--featured-paper' : ''}${moving ? ' scene-copy--moving' : ''}`}>
       <div className="intro-rule"><span /><p>{project?.tag ?? 'THE WORLD BETWEEN THE PAGES'}</p></div>
       <p className="scene-copy__index">{String(index).padStart(2, '0')} / {String(chapters.length - 1).padStart(2, '0')}</p>
-      <h1>{heading.split('\n').map(line => <span key={line}>{line}</span>)}</h1>
+      {project ? <h1 className="project-heading"><span className="project-heading__title">{project.title.replace('\n', ' ')}</span><span className="visually-hidden">{project.heroHeading.replace('\n', ' ')}</span></h1> :
+        <h1>{heading.split('\n').map(line => <span key={line}>{line}</span>)}</h1>}
       <p className="scene-copy__desc">{project?.summary ?? 'Follow the pages. A live journey through light, paper and space.'}</p>
       {index === 0 && <p className="intro-hint">MOVE YOUR POINTER · FOLLOW THE PAGES</p>}
     </div>}
     {!webEntered && <footer className="scene-footer">
       <div className="footer-chapters" aria-label="3D chapters">
         {chapters.map((entry, i) => <button className={`chapter-marker${entry === chapter ? ' chapter-marker--active' : ''}`}
-          key={entry} disabled={!ready || moving} onClick={() => goTo(entry)} aria-current={entry === chapter ? 'step' : undefined}
-          aria-label={`Go to ${entry}`}>
+          key={entry} disabled={!ready || !!error} onClick={() => goTo(entry, true)} aria-current={entry === chapter ? 'step' : undefined}
+          aria-label={entry === 'intro' ? 'Go to the space' : entry === 'screen' ? 'Go to the GitHub screen' : `Go to ${portfolio.projects.find(item => item.id === entry)?.title.replace('\n', ' ') ?? entry}`}>
           <span className="chapter-marker__index">0{i}</span><span className="chapter-marker__bar" />
           <span className="chapter-marker__name">{i === 0 ? 'THE SPACE' : entry === 'screen' ? 'THE SCREEN' : `PAPER 0${i}`}</span>
         </button>)}
@@ -577,9 +637,9 @@ export default function RealtimePreview() {
         </button>}
       </div>
     </footer>}
-    {!webEntered && chapter === 'screen' && ready && !moving && <div className="screen-caption"><span>GITHUB.COM / CORDEN404</span><button type="button" className="text-link" onClick={() => setWebEntered(true)}>VIEW COLLECTION <ArrowUpRight size={14} /></button></div>}
-    {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={() => goTo(chapters[chapters.length - 2], true)} /></div>}
-    {!ready && !error && <div className="loading-screen" role="status" aria-live="polite"><div className="loading-logo">LQ</div><p>PREPARING THE SCENE</p><div className="loading-progress"><i /></div><span>LIGHT, PAPER & SPACE</span></div>}
-    {error && <div className="error-screen" role="alert"><h2>The scene could not open.</h2><p>{error}</p><a className="next-button" href="/?render=video">OPEN THE ORIGINAL <ArrowUpRight size={16} /></a></div>}
+    {!webEntered && chapter === 'screen' && ready && !moving && <div className="screen-caption"><span>GITHUB.COM / CORDEN404</span><button type="button" className="text-link" onClick={openCollection}>VIEW COLLECTION <ArrowUpRight size={14} /></button></div>}
+    {webEntered && <div className="portfolio-transition"><FinalPortfolio onRevisit={revisitScene} /></div>}
+    {!webEntered && !ready && !error && <div className="loading-screen"><div role="status" aria-live="polite" className="loading-status"><div className="loading-logo">LQ</div><p>{completed < 8 ? 'LOADING SCENE RESOURCES' : 'DECODING & PREPARING 3D'}</p><progress value={completed} max={8} aria-label="Loaded scene data resources" /><span>{completed} / 8 DATA RESOURCES READY{completed === 8 ? ' · WAITING FOR FIRST FRAME' : ''}</span></div><button type="button" className="next-button" onClick={openCollection}>VIEW COLLECTION <ArrowUpRight size={16} /></button></div>}
+    {!webEntered && error && <div className="error-screen"><div role="alert"><h2>The scene could not open.</h2><p>{error}</p></div><button type="button" className="next-button" onClick={openCollection}>VIEW COLLECTION <ArrowUpRight size={16} /></button><button type="button" className="text-link" onClick={retryScene}>RETRY 3D <RotateCcw size={16} /></button><a className="text-link" href="/?render=video">OPEN THE ORIGINAL <ArrowUpRight size={16} /></a></div>}
   </div>;
 }
