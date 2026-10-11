@@ -14,6 +14,7 @@ Run `npm ci`, then `npm run dev`. Open the URL printed by Vite.
 - **CINEMA** uses a blurred ground reflection, 40 volume steps and up to 1.25 device pixel ratio, targeting 60 fps.
 - **LITE** uses 20 volume steps, a simpler floor and up to 1 device pixel ratio, targeting 30 fps. Narrow screens start in LITE.
 - Reduced motion switches directly between stops. Rendering pauses in hidden tabs and while viewing the HTML collection.
+- Stationary views reuse the existing full-resolution HDR frame after anti-aliasing. Film grain keeps animating; pointer movement, camera travel, quality changes and resizing refresh the complete scene, including reflections and volume lighting. This saves idle GPU work without reducing geometry, texture, lighting or reflection quality.
 - **View collection** retains the accessible project catalogue; **The scene** returns to the final featured sheet.
 
 Use `?chapter=paper-c` to open any chapter directly. Add `&view=scene` to hide the interface. The original rendered version remains at `?render=video`; it also provides a fallback for devices without WebGL2.
@@ -41,3 +42,5 @@ npm run build
 ```
 
 Scene assets live in `public/assets/realtime`. Screen captures used by the display are delivery assets; local comparison images, benchmarks and scratch scripts remain in ignored `.work/` folders.
+
+Source shadowing is included in the baked surface and volume fields. The browser omits an unused realtime shadow map and its depth materials. Paper detail selection uses squared distances to avoid temporary arrays and square roots, with the same detail level for every sheet.

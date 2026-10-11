@@ -8,8 +8,8 @@ import { Component, Suspense, useCallback, useEffect, useMemo, useRef, useState 
 import type { MutableRefObject, ReactNode } from 'react';
 import {
   AdditiveBlending, AgXToneMapping, Box3, BufferAttribute, BufferGeometry, Color, DoubleSide,
-  InstancedBufferAttribute, InstancedMesh, Matrix4, MathUtils, Mesh, MeshDepthMaterial,
-  MeshStandardMaterial, PerspectiveCamera, Quaternion, RGBADepthPacking, ShaderMaterial,
+  InstancedBufferAttribute, InstancedMesh, Matrix4, MathUtils, Mesh,
+  MeshStandardMaterial, PerspectiveCamera, Quaternion, ShaderMaterial,
   SRGBColorSpace, Vector3,
 } from 'three';
 import type { DirectionalLight, Texture } from 'three';
@@ -24,6 +24,8 @@ import type { AtmosphereData } from './RealtimeFog';
 import RealtimeGrade from './RealtimeGrade';
 import { createLightingTexture, createPaperMaterial } from './realtimePaperMaterial';
 import type { LightingTexture } from './realtimePaperMaterial';
+import { createRenderSchedule, FrameSchedule, StaticSceneCache } from './realtimeRenderSchedule';
+import type { RenderSchedule } from './realtimeRenderSchedule';
 import './realtime-preview.css';
 
 RectAreaLightUniformsLib.init();
@@ -42,7 +44,7 @@ type LightingData = { sourceSha256: string; bakedPapers: number; grid: [number, 
 type HeroLightingData = { sourceSha256: string; names: string[]; frames: number[]; grid: [number, number]; weights: [number, number, number][] };
 type SceneBundle = { data: SceneData; binary: ArrayBuffer; lighting: LightingData; lightBinary: ArrayBuffer;
   atmosphere: AtmosphereData; volumeBinary: ArrayBuffer; heroLighting: HeroLightingData; heroBinary: ArrayBuffer };
-type PreviewStats = { ready: boolean; frame: number; fps: number; renderFrames: number; triangles: number; drawCalls: number; instances: number; moving: boolean; quality: Quality };
+type PreviewStats = { ready: boolean; frame: number; fps: number; renderFrames: number; cachedFrames: number; presentedFrames: number; triangles: number; drawCalls: number; instances: number; moving: boolean; quality: Quality };
 declare global { interface Window { __PAPER_3D?: PreviewStats } }
 
 const params = new URLSearchParams(window.location.search);
@@ -121,7 +123,6 @@ function PaperInstances({ data, binary, textures, lighting, grid }: {
   data: SceneData; binary: ArrayBuffer; textures: Texture[]; lighting: LightingTexture; grid: [number, number];
 }) {
   const collection = useMemo(() => {
-    const depths = new MeshDepthMaterial({ depthPacking: RGBADepthPacking, side: DoubleSide });
     const materials: ShaderMaterial[] = [];
     const meshes: InstancedMesh[] = [];
     const matrix = new Matrix4();
@@ -135,10 +136,12 @@ function PaperInstances({ data, binary, textures, lighting, grid }: {
       for (let i = 0; i < group.count; i++) {
         const start = i * data.instanceStride;
         const x = records[start + 12], y = records[start + 13], z = records[start + 14];
-        const nearest = Math.min(...cameraPoints.map(p => {
-          return Math.hypot(x - p[0], y - p[1], z - p[2]);
-        }));
-        const level = nearest < 2.7 ? 2 : nearest < 6 ? 1 : 0;
+        let nearestSquared = Infinity;
+        for (const p of cameraPoints) {
+          const dx = x - p[0], dy = y - p[1], dz = z - p[2];
+          nearestSquared = Math.min(nearestSquared, dx * dx + dy * dy + dz * dz);
+        }
+        const level = nearestSquared < 2.7 * 2.7 ? 2 : nearestSquared < 36 ? 1 : 0;
         sets[level].push(i);
       }
       for (let level = 0; level < 3; level++) {
@@ -157,12 +160,10 @@ function PaperInstances({ data, binary, textures, lighting, grid }: {
         mesh.name = `${group.name} / detail ${level}`;
         mesh.instanceMatrix.needsUpdate = true;
         mesh.computeBoundingSphere();
-        mesh.castShadow = !group.prototype.ground;
-        mesh.customDepthMaterial = depths;
         meshes.push(mesh);
       }
     }
-    return { meshes, materials, depths, users: 0 };
+    return { meshes, materials, users: 0 };
   }, [binary, data, textures, lighting, grid]);
   useEffect(() => {
     collection.users++;
@@ -172,7 +173,6 @@ function PaperInstances({ data, binary, textures, lighting, grid }: {
         if (collection.users) return;
         collection.meshes.forEach(mesh => { mesh.geometry.dispose(); mesh.dispose(); });
         collection.materials.forEach(material => material.dispose());
-        collection.depths.dispose();
       });
     };
   }, [collection]);
@@ -235,7 +235,7 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
       if (!(object as Mesh).isMesh) return;
       const mesh = object as Mesh;
       const name = mesh.name.replace(/_/g, ' ');
-      mesh.castShadow = !name.includes('display');
+      mesh.castShadow = false;
       mesh.receiveShadow = false;
       if (name === 'Polished concrete floor') {
         floorHeight = new Box3().setFromObject(mesh).max.y;
@@ -325,7 +325,7 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
       material.uniforms.uFillFrameBase.value = 2 * stride;
       material.uniforms.uFillBlend.value = fill;
     });
-  });
+  }, -1);
   return <>
     <primitive object={room.scene} dispose={null} onClick={(event: { object: Mesh; stopPropagation: () => void }) => {
       if (event.object.name.replace(/_/g, ' ').includes('Monitor warm display')) {
@@ -339,31 +339,12 @@ function Room({ quality, version, lighting, metadata, frame, onOpenScreen }: { q
   </>;
 }
 
-function FrameSchedule({ active, quality }: { active: boolean; quality: Quality }) {
-  const { invalidate } = useThree();
-  useEffect(() => {
-    if (!active) return;
-    let frame = 0;
-    let last = performance.now();
-    const interval = 1000 / (quality === 'cinema' ? 60 : 30);
-    const tick = (now: number) => {
-      if (document.visibilityState === 'visible' && now - last >= interval) {
-        last = now - (now - last) % interval;
-        invalidate();
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [active, invalidate, quality]);
-  return null;
-}
-
-function World({ bundle, chapter, quality, reducedMotion, jump, onReady, onArrive, onOpenScreen }: {
+function World({ bundle, chapter, quality, reducedMotion, jump, schedule, onReady, onArrive, onOpenScreen }: {
   bundle: SceneBundle; chapter: Chapter; quality: Quality;
+  schedule: RenderSchedule;
   reducedMotion: boolean; jump: boolean; onReady: () => void; onArrive: () => void; onOpenScreen: () => void;
 }) {
-  const { camera, size, gl } = useThree();
+  const { camera, size, gl, invalidate } = useThree();
   const light = useRef<DirectionalLight>(null);
   const frame = useRef(bundle.data.stops[chapters.includes(requested) ? requested : 'intro']);
   const flight = useRef<{ from: number; to: number; elapsed: number; duration: number } | null>(null);
@@ -390,22 +371,25 @@ function World({ bundle, chapter, quality, reducedMotion, jump, onReady, onArriv
   const nextPoint = useMemo(() => new Vector3(), []);
   const rotation = useMemo(() => new Quaternion(), []);
   const nextRotation = useMemo(() => new Quaternion(), []);
-  const fps = useRef({ frames: 0, elapsed: 0, value: 0, total: 0 });
+  const sceneFrames = useRef(0);
   const parallax = useRef({ x: 0, y: 0 });
   const ready = useRef(false);
 
   useEffect(() => {
+    schedule.warmFrames = 3;
+    invalidate();
     const target = bundle.data.stops[chapter];
     if (Math.abs(target - frame.current) < .01) { onArrive(); return; }
     if (reducedMotion || jump) { frame.current = target; flight.current = null; onArrive(); return; }
     flight.current = { from: frame.current, to: target, elapsed: 0, duration: Math.min(8, Math.abs(target - frame.current) / 28) };
-  }, [bundle.data.stops, chapter, jump, onArrive, reducedMotion]);
+  }, [bundle.data.stops, chapter, invalidate, jump, onArrive, reducedMotion, schedule]);
 
   useFrame((state, delta) => {
     if (!ready.current) { ready.current = true; onReady(); }
+    const motionDelta = Math.min(delta, .1, Math.max(0, (performance.now() - schedule.lastPresentation) / 1000));
     const moving = flight.current;
     if (moving) {
-      moving.elapsed += Math.min(delta, .1);
+      moving.elapsed += motionDelta;
       const portion = Math.min(1, moving.elapsed / moving.duration);
       frame.current = MathUtils.lerp(moving.from, moving.to, portion);
       if (portion === 1) { flight.current = null; onArrive(); }
@@ -427,38 +411,41 @@ function World({ bundle, chapter, quality, reducedMotion, jump, onReady, onArriv
     const fov = MathUtils.radToDeg(2 * Math.atan(bundle.data.camera.sensorWidth / (2 * lens * coverAspect)));
     const perspective = camera as PerspectiveCamera;
     if (Math.abs(perspective.fov - fov) > .001) { perspective.fov = fov; perspective.updateProjectionMatrix(); }
+    let settling = false;
     if (!still && !reducedMotion && !flight.current) {
-      parallax.current.x = MathUtils.damp(parallax.current.x, state.pointer.x * .010, 3, delta);
-      parallax.current.y = MathUtils.damp(parallax.current.y, state.pointer.y * .006, 3, delta);
+      const targetX = state.pointer.x * .010, targetY = state.pointer.y * .006;
+      // R3F's delta includes the idle interval; clamp it to keep pointer
+      // motion smooth when the complete scene wakes from its cached view.
+      parallax.current.x = MathUtils.damp(parallax.current.x, targetX, 3, motionDelta);
+      parallax.current.y = MathUtils.damp(parallax.current.y, targetY, 3, motionDelta);
+      settling = Math.abs(parallax.current.x - targetX) > 1e-8 || Math.abs(parallax.current.y - targetY) > 1e-8;
+      if (!settling) { parallax.current.x = targetX; parallax.current.y = targetY; }
       camera.translateX(parallax.current.x); camera.translateY(parallax.current.y);
       camera.rotateY(-parallax.current.x * .07); camera.rotateX(parallax.current.y * .07);
     }
+    schedule.moving = !!flight.current || settling;
     camera.updateMatrixWorld();
     if (light.current) {
       light.current.target.position.set(0, 3, 1);
       light.current.target.updateMatrixWorld();
     }
-    fps.current.frames++; fps.current.total++; fps.current.elapsed += delta;
-    if (fps.current.elapsed >= .6) {
-      fps.current.value = Math.round(fps.current.frames / fps.current.elapsed);
-      fps.current.frames = 0; fps.current.elapsed = 0;
-    }
+    sceneFrames.current++;
     window.__PAPER_3D = {
-      ready: true, frame: frame.current, fps: fps.current.value, renderFrames: fps.current.total,
+      ready: true, frame: frame.current, fps: schedule.fps, renderFrames: sceneFrames.current,
+      cachedFrames: schedule.cachedFrames, presentedFrames: schedule.presentedFrames,
       triangles: gl.info.render.triangles, drawCalls: gl.info.render.calls,
       instances: bundle.data.instanceCount, moving: !!flight.current, quality,
     };
     gl.info.reset();
-  });
+  }, -2);
 
   return <>
     <color attach="background" args={['#080f13']} />
     <ambientLight intensity={.12} color="#a4bec4" />
     <hemisphereLight args={['#b8d7dc', '#080d10', .30]} />
-    <directionalLight ref={light} position={[-.4, 12, -8]} color="#c0dae1" intensity={3.2}
-      castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-10} shadow-camera-right={10}
-      shadow-camera-top={10} shadow-camera-bottom={-10} shadow-camera-near={.1} shadow-camera-far={36}
-      shadow-bias={-.001} shadow-autoUpdate={false} shadow-needsUpdate />
+    {/* Source shadows are included in the baked surface/volume fields. No
+        mesh receives a second, realtime shadow map. */}
+    <directionalLight ref={light} position={[-.4, 12, -8]} color="#c0dae1" intensity={3.2} />
     <directionalLight position={[-1, 13, 1]} color="#a4c1cf" intensity={.38} />
     <directionalLight position={[-5, 7, 7]} color="#a4c0c5" intensity={.10} />
     <rectAreaLight position={[0, 5.5, 7]} rotation={[-.5, 0, 0]} color="#c2d0d3"
@@ -471,11 +458,12 @@ function World({ bundle, chapter, quality, reducedMotion, jump, onReady, onArriv
     </mesh>
     <PaperInstances data={bundle.data} binary={bundle.binary} textures={textures} lighting={lighting} grid={bundle.lighting.grid} />
     <Room quality={quality} version={bundle.data.assetVersion} lighting={heroLighting} metadata={bundle.heroLighting} frame={frame} onOpenScreen={onOpenScreen} />
-    <EffectComposer multisampling={0} enableNormalPass={false}>
+    <EffectComposer enabled={false} multisampling={0} enableNormalPass={false}>
       <RealtimeFog field={atmosphere} quality={quality} />
       <Bloom mipmapBlur luminanceThreshold={1.5} luminanceSmoothing={.28} intensity={.20} />
       <RealtimeGrade version={bundle.data.assetVersion} />
       <SMAA />
+      <StaticSceneCache schedule={schedule} />
       <Noise opacity={.008} blendFunction={BlendFunction.SOFT_LIGHT} />
     </EffectComposer>
   </>;
@@ -489,6 +477,7 @@ class PreviewBoundary extends Component<{ children: ReactNode; onError: (message
 }
 
 export default function RealtimePreview() {
+  const schedule = useMemo(createRenderSchedule, []);
   const [bundle, setBundle] = useState<SceneBundle>();
   const [chapter, setChapter] = useState<Chapter>(chapters.includes(requested) ? requested : 'intro');
   const [ready, setReady] = useState(false);
@@ -544,13 +533,13 @@ export default function RealtimePreview() {
       if (!sceneOnly && chapter !== 'screen') goTo(chapters[index + 1]);
     }}>
       {bundle && <PreviewBoundary onError={onError}>
-        <Canvas frameloop="demand" shadows="basic" dpr={quality === 'cinema' ? [1, 1.25] : [0.75, 1]}
+        <Canvas frameloop="demand" dpr={quality === 'cinema' ? [1, 1.25] : [0.75, 1]}
           gl={{ antialias: false, powerPreference: 'high-performance', toneMapping: AgXToneMapping, toneMappingExposure: .9 }}
           onCreated={({ gl }) => { gl.info.autoReset = false; }}
           camera={{ near: .025, far: 55, position: [0, 2, 8] }}>
-          <FrameSchedule active={!webEntered} quality={quality} />
+          <FrameSchedule active={!webEntered} quality={quality} schedule={schedule} />
           <Suspense fallback={null}>
-            <World bundle={bundle} chapter={chapter} quality={quality} reducedMotion={reducedMotion} jump={jump} onReady={onReady} onArrive={onArrive} onOpenScreen={onOpenScreen} />
+            <World bundle={bundle} chapter={chapter} quality={quality} reducedMotion={reducedMotion} jump={jump} schedule={schedule} onReady={onReady} onArrive={onArrive} onOpenScreen={onOpenScreen} />
           </Suspense>
         </Canvas>
       </PreviewBoundary>}
