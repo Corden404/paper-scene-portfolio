@@ -20,5 +20,6 @@ public/assets/*.tmp.glb
 .work/
 .plans/
 .trash/
-# Local visual review notes are not website assets.
+# Local visual review notes and future planning are not website assets.
 design-qa.md
+V4 — Reference Match/Lighting Keyframes 2026-10-11/REVIEW_AND_NEXT_STEPS.md
